@@ -229,12 +229,16 @@ def check_battlefield(chat_id):
                     posted_items.add(item_id)
 
 # Корневой маршрут для проверки Render
-@app.route('/', methods=['GET'])
-def home():
-    return "Bot is alive. Use /check in Telegram to trigger.", 200
-
-# Обработка webhook-запросов от Telegram
 @app.route('/webhook', methods=['POST'])
+def webhook():
+    print("Получен запрос на /webhook")
+    update = telebot.types.Update.de_json(request.get_json())
+    if update.message:
+        print(f"Сообщение: {update.message.text}, Chat ID: {update.message.chat.id}")
+        if update.message.text == '/check':
+            chat_id = update.message.chat.id
+            threading.Thread(target=check_battlefield, args=(chat_id,), daemon=True).start()
+    return 'OK', 200
 def webhook():
     print("Получен запрос на /webhook")
     update = telebot.types.Update.de_json(request.get_json())
