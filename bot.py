@@ -7,11 +7,11 @@ from flask import Flask, request
 import threading
 
 # Токен бота
-TOKEN = '7790106263:AAHKNdO8yDrDbmZzoB8U64hMTNhPr0LkxrU'  # Замени на свой токен от BotFather
+TOKEN = '7790106263:AAHKNdO8yDrDbmZzoB8U64hMTNhPr0LkxrU'  # Замени на токен @ValBest_Bot
 bot = telebot.TeleBot(TOKEN)
 
 # Чат для публикации
-CHAT_ID = '@SalePixel'  # Замени на свой канал
+CHAT_ID = '@SalePixel'  # Твой канал
 
 # Список Battlefield игр с их Steam ID
 BATTLEFIELD_GAMES = {
