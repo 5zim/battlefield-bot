@@ -1,22 +1,24 @@
 import requests
 import schedule
 import time
+import threading
 from datetime import datetime
 import telebot
 import re
 from bs4 import BeautifulSoup
+from http.server import BaseHTTPRequestHandler, HTTPServer
 
 # Токен бота
-TOKEN = '7790106263:AAHKNdO8yDrDbmZzoB8U64hMTNhPr0LkxrU'
+TOKEN = '7790106263:AAHKNdO8yDrDbmZzoB8U64hMTNhPr0LkxrU'  # Замени на свой токен от BotFather
 bot = telebot.TeleBot(TOKEN)
 
 # Чат для публикации
-CHAT_ID = '@SalePixel'
+CHAT_ID = '@SalePixel'  # Замени на свой канал
 
-# Хранилище
+# Хранилище для отслеживания уже опубликованных скидок
 posted_items = set()
 
-# Список Battlefield
+# Список Battlefield игр с их Steam ID
 BATTLEFIELD_GAMES = {
     'Battlefield 1': {'steam_id': 1238840},
     'Battlefield 3': {'steam_id': 1238820},
@@ -25,6 +27,19 @@ BATTLEFIELD_GAMES = {
     'Battlefield 2042': {'steam_id': 1517290},
     'Battlefield Hardline': {'steam_id': 1238880}
 }
+
+# Keep-alive сервер для Render
+class KeepAliveHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.send_header("Content-type", "text/plain")
+        self.end_headers()
+        self.wfile.write(b"OK")
+
+def run_keep_alive_server():
+    server = HTTPServer(('0.0.0.0', 8000), KeepAliveHandler)
+    print("Запущен keep-alive сервер на порту 8000...")
+    server.serve_forever()
 
 # Steam: Скидки и раздачи
 def get_steam_battlefield():
@@ -239,7 +254,12 @@ def run_schedule():
             time.sleep(1)
         except Exception as e:
             print(f"Ошибка в расписании: {e}")
-            time.sleep(60)
+            time.sleep(60)  # Пауза перед повторной попыткой
 
+# Запуск
 if __name__ == "__main__":
+    # Запуск keep-alive сервера в отдельном потоке
+    keep_alive_thread = threading.Thread(target=run_keep_alive_server, daemon=True)
+    keep_alive_thread.start()
+    # Запуск основного расписания
     run_schedule()
