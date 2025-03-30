@@ -145,7 +145,7 @@ def get_epic_battlefield():
                 })
         print(f"Найдено раздач в Epic: {len(free_games)}")
         return free_games
-    except Exception as.callbacks:
+    except Exception as e:
         print(f"Ошибка Epic: {e}")
         return []
 
