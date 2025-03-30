@@ -31,7 +31,7 @@ posted_items = set()
 
 # Steam: Скидки и раздачи
 def get_steam_battlefield():
-    print("Проверяю Battlefield в Steam...")
+    print("Проверяю Battlefield в Steam...", flush=True)
     discounts = []
     try:
         for title, info in BATTLEFIELD_GAMES.items():
@@ -52,27 +52,27 @@ def get_steam_battlefield():
                             'old_price': old_price, 'new_price': new_price,
                             'discount_percent': discount_percent
                         })
-        print(f"Найдено в Steam: {len(discounts)}")
+        print(f"Найдено в Steam: {len(discounts)}", flush=True)
         return discounts
     except Exception as e:
-        print(f"Ошибка Steam: {e}")
+        print(f"Ошибка Steam: {e}", flush=True)
         return []
 
 # EA App: Скидки и раздачи
 def get_ea_battlefield():
-    print("Проверяю Battlefield в EA App...")
+    print("Проверяю Battlefield в EA App...", flush=True)
     url = "https://www.ea.com/games"
     discounts = []
     try:
-        print(f"Отправляю запрос к {url}")
+        print(f"Отправляю запрос к {url}", flush=True)
         response = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=10)
-        print(f"Получен ответ: Статус {response.status_code}")
+        print(f"Получен ответ: Статус {response.status_code}", flush=True)
         if response.status_code != 200:
-            print(f"Ошибка EA: Статус {response.status_code}")
+            print(f"Ошибка EA: Статус {response.status_code}", flush=True)
             return discounts
         soup = BeautifulSoup(response.text, 'html.parser')
         game_elements = soup.find_all('div', class_=re.compile('game-card|title'))
-        print(f"Найдено элементов для парсинга: {len(game_elements)}")
+        print(f"Найдено элементов для парсинга: {len(game_elements)}", flush=True)
         for game in game_elements:
             title_elem = game.find('h3') or game.find('span', class_=re.compile('title'))
             if title_elem and 'Battlefield' in title_elem.text:
@@ -102,20 +102,20 @@ def get_ea_battlefield():
                             'old_price': old_price, 'new_price': new_price,
                             'discount_percent': discount_percent
                         })
-        print(f"Найдено в EA: {len(discounts)}")
+        print(f"Найдено в EA: {len(discounts)}", flush=True)
         return discounts
     except Exception as e:
-        print(f"Ошибка EA: {e}")
+        print(f"Ошибка EA: {e}", flush=True)
         return discounts
 
 # Epic Games: Только бесплатные раздачи
 def get_epic_battlefield():
-    print("Проверяю Battlefield в Epic Games...")
+    print("Проверяю Battlefield в Epic Games...", flush=True)
     url = "https://store-site-backend-static.ak.epicgames.com/freeGamesPromotions?locale=en-US&country=US&allowCountries=US"
     try:
         response = requests.get(url, timeout=10)
         if response.status_code != 200:
-            print(f"Ошибка Epic: Статус {response.status_code}")
+            print(f"Ошибка Epic: Статус {response.status_code}", flush=True)
             return []
         data = response.json()
         games = data['data']['Catalog']['searchStore']['elements']
@@ -137,20 +137,20 @@ def get_epic_battlefield():
                     'new_price': 0, 'discount_percent': 100,
                     'end_date': end_date
                 })
-        print(f"Найдено раздач в Epic: {len(free_games)}")
+        print(f"Найдено раздач в Epic: {len(free_games)}", flush=True)
         return free_games
     except Exception as e:
-        print(f"Ошибка Epic: {e}")
+        print(f"Ошибка Epic: {e}", flush=True)
         return []
 
 # Prime Gaming: Скидки и раздачи
 def get_prime_battlefield():
-    print("Проверяю Battlefield в Prime Gaming...")
+    print("Проверяю Battlefield в Prime Gaming...", flush=True)
     url = "https://gaming.amazon.com/home"
     try:
         response = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=10)
         if response.status_code != 200:
-            print(f"Ошибка Prime Gaming: Статус {response.status_code}")
+            print(f"Ошибка Prime Gaming: Статус {response.status_code}", flush=True)
             return []
         soup = BeautifulSoup(response.text, 'html.parser')
         games = soup.select('div[data-a-target="offer-card"]')
@@ -184,15 +184,15 @@ def get_prime_battlefield():
                             'old_price': old_price, 'new_price': new_price,
                             'discount_percent': discount_percent
                         })
-        print(f"Найдено в Prime Gaming: {len(discounts)}")
+        print(f"Найдено в Prime Gaming: {len(discounts)}", flush=True)
         return discounts
     except Exception as e:
-        print(f"Ошибка Prime Gaming: {e}")
+        print(f"Ошибка Prime Gaming: {e}", flush=True)
         return []
 
 # Проверка и публикация
 def check_battlefield(chat_id):
-    print("Запускаю проверку Battlefield...")
+    print("Запускаю проверку Battlefield...", flush=True)
     steam_items = get_steam_battlefield()
     ea_items = get_ea_battlefield()
     epic_items = get_epic_battlefield()
@@ -203,9 +203,9 @@ def check_battlefield(chat_id):
         message = "🔍 Пока Battlefield отдыхает от скидок и раздач."
         try:
             bot.send_message(chat_id, message)
-            print("Отправлено сообщение об отсутствии скидок")
+            print("Отправлено сообщение об отсутствии скидок", flush=True)
         except Exception as e:
-            print(f"Ошибка отправки сообщения: {e}")
+            print(f"Ошибка отправки сообщения: {e}", flush=True)
     else:
         for item in all_items:
             item_id = f"{item['platform']}_{item['title']}_{item['new_price']}"
@@ -222,24 +222,25 @@ def check_battlefield(chat_id):
                 try:
                     bot.send_photo(chat_id, item['image'], caption=message)
                     posted_items.add(item_id)
-                    print(f"Опубликована: {item['title']} ({item['platform']})")
+                    print(f"Опубликована: {item['title']} ({item['platform']})", flush=True)
                 except Exception as e:
-                    print(f"Ошибка публикации: {e}")
+                    print(f"Ошибка публикации: {e}", flush=True)
                     bot.send_message(chat_id, message)
                     posted_items.add(item_id)
 
 # Корневой маршрут для проверки Render
 @app.route('/', methods=['GET'])
 def home():
+    print("Проверка корневого маршрута", flush=True)
     return "Bot is alive. Use /check in Telegram to trigger.", 200
 
 # Обработка webhook-запросов от Telegram
 @app.route('/webhook', methods=['POST'])
 def webhook():
-    print("Получен запрос на /webhook")
+    print("Получен запрос на /webhook", flush=True)
     update = telebot.types.Update.de_json(request.get_json())
     if update.message:
-        print(f"Сообщение: {update.message.text}, Chat ID: {update.message.chat.id}")
+        print(f"Сообщение: {update.message.text}, Chat ID: {update.message.chat.id}", flush=True)
         if update.message.text == '/check':
             chat_id = update.message.chat.id
             threading.Thread(target=check_battlefield, args=(chat_id,), daemon=True).start()
@@ -251,12 +252,12 @@ def set_webhook():
     try:
         bot.remove_webhook()
         bot.set_webhook(url=webhook_url)
-        print(f"Webhook установлен: {webhook_url}")
+        print(f"Webhook установлен: {webhook_url}", flush=True)
     except Exception as e:
-        print(f"Ошибка установки webhook: {e}")
+        print(f"Ошибка установки webhook: {e}", flush=True)
 
 # Запуск
 if __name__ == "__main__":
-    print("Бот запущен!")
+    print("Бот запущен!", flush=True)
     set_webhook()
     app.run(host='0.0.0.0', port=8000)
