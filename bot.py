@@ -3,7 +3,7 @@ from datetime import datetime
 import telebot
 import re
 from bs4 import BeautifulSoup
-from http.server import BaseHTTPRequestHandler, HTTPServer
+from flask import Flask, request
 import threading
 
 # Токен бота
@@ -12,9 +12,6 @@ bot = telebot.TeleBot(TOKEN)
 
 # Чат для публикации
 CHAT_ID = '@SalePixel'  # Замени на свой канал
-
-# Хранилище для отслеживания скидок (сбрасывается при каждом запуске)
-posted_items = set()
 
 # Список Battlefield игр с их Steam ID
 BATTLEFIELD_GAMES = {
@@ -26,26 +23,11 @@ BATTLEFIELD_GAMES = {
     'Battlefield Hardline': {'steam_id': 1238880}
 }
 
-# Keep-alive сервер для Render
-class RequestHandler(BaseHTTPRequestHandler):
-    def do_GET(self):
-        if self.path == '/check':
-            # При получении запроса выполняем проверку
-            threading.Thread(target=check_battlefield, daemon=True).start()
-            self.send_response(200)
-            self.send_header("Content-type", "text/plain")
-            self.end_headers()
-            self.wfile.write(b"Checking Battlefield discounts...")
-        else:
-            self.send_response(200)
-            self.send_header("Content-type", "text/plain")
-            self.end_headers()
-            self.wfile.write(b"Bot is alive. Use /check in Telegram to trigger.")
+# Flask приложение
+app = Flask(__name__)
 
-def run_keep_alive_server():
-    server = HTTPServer(('0.0.0.0', 8000), RequestHandler)
-    print("Запущен сервер на порту 8000...")
-    server.serve_forever()
+# Хранилище для отслеживания скидок
+posted_items = set()
 
 # Steam: Скидки и раздачи
 def get_steam_battlefield():
@@ -209,7 +191,7 @@ def get_prime_battlefield():
         return []
 
 # Проверка и публикация
-def check_battlefield():
+def check_battlefield(chat_id):
     print("Запускаю проверку Battlefield...")
     steam_items = get_steam_battlefield()
     ea_items = get_ea_battlefield()
@@ -220,7 +202,7 @@ def check_battlefield():
     if not all_items:
         message = "🔍 Пока Battlefield отдыхает от скидок и раздач."
         try:
-            bot.send_message(CHAT_ID, message)
+            bot.send_message(chat_id, message)
             print("Отправлено сообщение об отсутствии скидок")
         except Exception as e:
             print(f"Ошибка отправки сообщения: {e}")
@@ -238,18 +220,34 @@ def check_battlefield():
                                f"Старая цена: ${item['old_price']:.2f}\nНовая цена: ${item['new_price']:.2f}\n"
                                f"Скидка: {item['discount_percent']}%")
                 try:
-                    bot.send_photo(CHAT_ID, item['image'], caption=message)
+                    bot.send_photo(chat_id, item['image'], caption=message)
                     posted_items.add(item_id)
                     print(f"Опубликована: {item['title']} ({item['platform']})")
                 except Exception as e:
                     print(f"Ошибка публикации: {e}")
-                    bot.send_message(CHAT_ID, message)
+                    bot.send_message(chat_id, message)
                     posted_items.add(item_id)
+
+# Обработка webhook-запросов от Telegram
+@app.route('/webhook', methods=['POST'])
+def webhook():
+    update = telebot.types.Update.de_json(request.get_json())
+    if update.message and update.message.text == '/check':
+        chat_id = update.message.chat.id
+        threading.Thread(target=check_battlefield, args=(chat_id,), daemon=True).start()
+    return 'OK', 200
+
+# Установка webhook при запуске
+def set_webhook():
+    webhook_url = 'https://battlefield-bot-xxx.onrender.com/webhook'  # Замени на свой URL
+    bot.remove_webhook()  # Удаляем старый webhook, если есть
+    bot.set_webhook(url=webhook_url)
+    print(f"Webhook установлен: {webhook_url}")
 
 # Запуск
 if __name__ == "__main__":
     print("Бот запущен!")
-    server_thread = threading.Thread(target=run_keep_alive_server, daemon=True)
-    server_thread.start()
-    # Бот остаётся активным, ожидая запросов на /check
-    server_thread.join()
+    # Устанавливаем webhook в отдельном потоке
+    threading.Thread(target=set_webhook, daemon=True).start()
+    # Запускаем Flask на порту 8000
+    app.run(host='0.0.0.0', port=8000)
