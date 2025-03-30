@@ -64,7 +64,7 @@ def get_steam_battlefield():
         print(f"Ошибка Steam: {e}")
         return []
 
-# EA App: Скидки и раздачи (переход на BeautifulSoup)
+# EA App: Скидки и раздачи
 def get_ea_battlefield():
     print("Проверяю Battlefield в EA App...")
     url = "https://www.ea.com/games"
@@ -76,7 +76,6 @@ def get_ea_battlefield():
         if response.status_code != 200:
             print(f"Ошибка EA: Статус {response.status_code}")
             return discounts
-        print("Начинаю парсинг страницы...")
         soup = BeautifulSoup(response.text, 'html.parser')
         game_elements = soup.find_all('div', class_=re.compile('game-card|title'))
         print(f"Найдено элементов для парсинга: {len(game_elements)}")
@@ -84,7 +83,6 @@ def get_ea_battlefield():
             title_elem = game.find('h3') or game.find('span', class_=re.compile('title'))
             if title_elem and 'Battlefield' in title_elem.text:
                 title = title_elem.text.strip()
-                print(f"Обнаружено: {title}")
                 price_elem = game.find(string=re.compile(r'\$\d+\.\d+|\bFREE\b'))
                 if price_elem:
                     if 'FREE' in price_elem:
@@ -110,7 +108,6 @@ def get_ea_battlefield():
                             'old_price': old_price, 'new_price': new_price,
                             'discount_percent': discount_percent
                         })
-                        print(f"Добавлено: {title}, Скидка: {discount_percent}%")
         print(f"Найдено в EA: {len(discounts)}")
         return discounts
     except Exception as e:
@@ -148,7 +145,7 @@ def get_epic_battlefield():
                 })
         print(f"Найдено раздач в Epic: {len(free_games)}")
         return free_games
-    except Exception as e:
+    except Exception as.callbacks:
         print(f"Ошибка Epic: {e}")
         return []
 
@@ -268,19 +265,13 @@ def run_schedule():
         schedule.run_pending()
         time.sleep(1)
 
-# Запуск с защитой от дублирования
+# Запуск
 if __name__ == "__main__":
     print("Бот запущен!")
     try:
-        bot.get_me()
-        check_battlefield()
+        check_battlefield()  # Первая проверка сразу
         schedule_thread = threading.Thread(target=run_schedule, daemon=True)
         schedule_thread.start()
-        bot.polling(none_stop=True, skip_pending=True)
-    except telebot.apihelper.ApiTelegramException as e:
-        if e.result_json['error_code'] == 409:
-            print("Ошибка: Другой экземпляр бота уже запущен. Закрой все процессы и попробуй снова.")
-        else:
-            print(f"Ошибка запуска: {e}")
+        bot.polling(none_stop=True, skip_pending=True)  # Запуск бота без проверки дубликатов
     except Exception as e:
         print(f"Ошибка запуска: {e}")
