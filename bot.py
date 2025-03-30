@@ -244,7 +244,7 @@ def webhook():
 
 # Установка webhook при запуске
 def set_webhook():
-    webhook_url = 'https://battlefield-bot.onrender.com'  # Замени на свой URL после деплоя
+    webhook_url = 'https://battlefield-bot.onrender.com/webhook'  # Замени на свой URL после деплоя
     try:
         bot.remove_webhook()  # Удаляем старый webhook, если есть
         bot.set_webhook(url=webhook_url)
