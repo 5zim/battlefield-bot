@@ -9,11 +9,11 @@ import re
 from bs4 import BeautifulSoup
 
 # Токен бота
-TOKEN = 'ВСТАВЬ_СВОЙ_ТОКЕН_СЮДА'
+TOKEN = '7790106263:AAHKNdO8yDrDbmZzoB8U64hMTNhPr0LkxrU'
 bot = telebot.TeleBot(TOKEN)
 
 # Чат для публикации
-CHAT_ID = '@ТвойКанал'
+CHAT_ID = '@SalePixel'
 
 # Хранилище
 posted_items = set()
@@ -206,7 +206,7 @@ def check_battlefield():
     all_items = steam_items + ea_items + epic_items + prime_items
 
     if not all_items:
-        message = "🔍 Пока Battlefield отдыхает от скидок и раздач. Солдаты, готовьте кошельки — ждём следующую атаку акций!"
+        message = "🔍 Пока Battlefield отдыхает от скидок и раздач."
         try:
             bot.send_message(CHAT_ID, message)
             print("Отправлено сообщение об отсутствии скидок")
