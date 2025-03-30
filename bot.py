@@ -9,11 +9,11 @@ import re
 from bs4 import BeautifulSoup
 
 # Токен бота
-TOKEN = '7790106263:AAHKNdO8yDrDbmZzoB8U64hMTNhPr0LkxrU'
+TOKEN = 'ВСТАВЬ_СВОЙ_ТОКЕН_СЮДА'
 bot = telebot.TeleBot(TOKEN)
 
 # Чат для публикации
-CHAT_ID = '@SalePixel'
+CHAT_ID = '@ТвойКанал'
 
 # Хранилище
 posted_items = set()
@@ -206,7 +206,7 @@ def check_battlefield():
     all_items = steam_items + ea_items + epic_items + prime_items
 
     if not all_items:
-        message = "🔍 Пока Battlefield отдыхает от скидок и раздач."
+        message = "🔍 Пока Battlefield отдыхает от скидок и раздач. Солдаты, готовьте кошельки — ждём следующую атаку акций!"
         try:
             bot.send_message(CHAT_ID, message)
             print("Отправлено сообщение об отсутствии скидок")
@@ -243,15 +243,18 @@ def check_battlefield():
 # Команды
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
+    print("Получена команда /start")
     bot.reply_to(message, "Привет! Я бот для скидок и раздач Battlefield (1, 3, 4, 5, 2042, Hardline) на Steam, EA App, Epic Games и Prime Gaming. Используй /subscribe!")
 
 @bot.message_handler(commands=['subscribe'])
 def subscribe(message):
+    print("Получена команда /subscribe")
     subscribers.add(message.chat.id)
     bot.reply_to(message, "Ты подписался на уведомления о Battlefield!")
 
 @bot.message_handler(commands=['unsubscribe'])
 def unsubscribe(message):
+    print("Получена команда /unsubscribe")
     if message.chat.id in subscribers:
         subscribers.remove(message.chat.id)
         bot.reply_to(message, "Ты отписался.")
@@ -260,6 +263,7 @@ def unsubscribe(message):
 
 # Расписание
 def run_schedule():
+    print("Запускаю расписание...")
     schedule.every(1).hours.do(check_battlefield)
     while True:
         schedule.run_pending()
@@ -269,9 +273,12 @@ def run_schedule():
 if __name__ == "__main__":
     print("Бот запущен!")
     try:
+        print("Начинаю первую проверку...")
         check_battlefield()  # Первая проверка сразу
+        print("Запускаю поток расписания...")
         schedule_thread = threading.Thread(target=run_schedule, daemon=True)
         schedule_thread.start()
-        bot.polling(none_stop=True, skip_pending=True)  # Запуск бота без проверки дубликатов
+        print("Запускаю polling...")
+        bot.polling(none_stop=True, skip_pending=True)
     except Exception as e:
         print(f"Ошибка запуска: {e}")
