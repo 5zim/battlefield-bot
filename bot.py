@@ -1,10 +1,8 @@
-import telebot
 import requests
 import schedule
 import time
-import threading
 from datetime import datetime
-from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
+import telebot
 import re
 from bs4 import BeautifulSoup
 
@@ -17,7 +15,6 @@ CHAT_ID = '@SalePixel'
 
 # Хранилище
 posted_items = set()
-subscribers = set()
 
 # Список Battlefield
 BATTLEFIELD_GAMES = {
@@ -28,12 +25,6 @@ BATTLEFIELD_GAMES = {
     'Battlefield 2042': {'steam_id': 1517290},
     'Battlefield Hardline': {'steam_id': 1238880}
 }
-
-# Кнопки
-def create_buttons(link):
-    markup = InlineKeyboardMarkup()
-    markup.add(InlineKeyboardButton("Купить/Забрать", url=link))
-    return markup
 
 # Steam: Скидки и раздачи
 def get_steam_battlefield():
@@ -225,44 +216,21 @@ def check_battlefield():
                     message = (f"Скидка!\nИгра: {item['title']}\nПлатформа: {item['platform']}\n"
                                f"Старая цена: ${item['old_price']:.2f}\nНовая цена: ${item['new_price']:.2f}\n"
                                f"Скидка: {item['discount_percent']}%")
-                buttons = create_buttons(item['link'])
                 try:
-                    bot.send_photo(CHAT_ID, item['image'], caption=message, reply_markup=buttons)
-                    for subscriber in subscribers:
-                        bot.send_photo(subscriber, item['image'], caption=message, reply_markup=buttons)
+                    bot.send_photo(CHAT_ID, item['image'], caption=message)
                     posted_items.add(item_id)
                     print(f"Опубликована: {item['title']} ({item['platform']})")
                 except Exception as e:
                     print(f"Ошибка публикации: {e}")
-                    bot.send_message(CHAT_ID, message, reply_markup=buttons)
-                    for subscriber in subscribers:
-                        bot.send_message(subscriber, message, reply_markup=buttons)
+                    bot.send_message(CHAT_ID, message)
                     posted_items.add(item_id)
                 time.sleep(3)
 
-# Команды
-@bot.message_handler(commands=['start'])
-def send_welcome(message):
-    print("Получена команда /start")
-    bot.reply_to(message, "Привет! Я бот для скидок и раздач Battlefield (1, 3, 4, 5, 2042, Hardline) на Steam, EA App, Epic Games и Prime Gaming. Используй /subscribe!")
-
-@bot.message_handler(commands=['subscribe'])
-def subscribe(message):
-    print("Получена команда /subscribe")
-    subscribers.add(message.chat.id)
-    bot.reply_to(message, "Ты подписался на уведомления о Battlefield!")
-
-@bot.message_handler(commands=['unsubscribe'])
-def unsubscribe(message):
-    print("Получена команда /unsubscribe")
-    if message.chat.id in subscribers:
-        subscribers.remove(message.chat.id)
-        bot.reply_to(message, "Ты отписался.")
-    else:
-        bot.reply_to(message, "Ты не подписан.")
-
 # Расписание
 def run_schedule():
+    print("Бот запущен!")
+    print("Начинаю первую проверку...")
+    check_battlefield()  # Первая проверка сразу
     print("Запускаю расписание...")
     schedule.every(1).hours.do(check_battlefield)
     while True:
@@ -271,23 +239,7 @@ def run_schedule():
             time.sleep(1)
         except Exception as e:
             print(f"Ошибка в расписании: {e}")
-            time.sleep(60)  # Пауза перед повторной попыткой
+            time.sleep(60)
 
-# Запуск
 if __name__ == "__main__":
-    print("Бот запущен!")
-    try:
-        print("Начинаю первую проверку...")
-        check_battlefield()  # Первая проверка сразу
-        print("Запускаю поток расписания...")
-        schedule_thread = threading.Thread(target=run_schedule, daemon=True)
-        schedule_thread.start()
-        print("Запускаю polling...")
-        while True:
-            try:
-                bot.polling(none_stop=True, skip_pending=True, interval=5)
-            except Exception as e:
-                print(f"Ошибка polling: {e}")
-                time.sleep(15)  # Перезапуск polling после ошибки
-    except Exception as e:
-        print(f"Критическая ошибка запуска: {e}")
+    run_schedule()
