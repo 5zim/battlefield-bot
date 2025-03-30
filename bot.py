@@ -10,7 +10,7 @@ import threading
 TOKEN = '7790106263:AAHKNdO8yDrDbmZzoB8U64hMTNhPr0LkxrU'  # Замени на свой токен от BotFather
 bot = telebot.TeleBot(TOKEN)
 
-# Чат для публикации
+# Чат для публикации (по умолчанию канал, но можно использовать chat_id из команды)
 CHAT_ID = '@SalePixel'  # Замени на свой канал
 
 # Список Battlefield игр с их Steam ID
@@ -228,6 +228,11 @@ def check_battlefield(chat_id):
                     bot.send_message(chat_id, message)
                     posted_items.add(item_id)
 
+# Корневой маршрут для проверки Render
+@app.route('/', methods=['GET'])
+def home():
+    return "Bot is alive. Use /check in Telegram to trigger.", 200
+
 # Обработка webhook-запросов от Telegram
 @app.route('/webhook', methods=['POST'])
 def webhook():
@@ -239,15 +244,18 @@ def webhook():
 
 # Установка webhook при запуске
 def set_webhook():
-    webhook_url = 'https://battlefield-bot-xxx.onrender.com/webhook'  # Замени на свой URL
-    bot.remove_webhook()  # Удаляем старый webhook, если есть
-    bot.set_webhook(url=webhook_url)
-    print(f"Webhook установлен: {webhook_url}")
+    webhook_url = 'https://battlefield-bot.onrender.com'  # Замени на свой URL после деплоя
+    try:
+        bot.remove_webhook()  # Удаляем старый webhook, если есть
+        bot.set_webhook(url=webhook_url)
+        print(f"Webhook установлен: {webhook_url}")
+    except Exception as e:
+        print(f"Ошибка установки webhook: {e}")
 
 # Запуск
 if __name__ == "__main__":
     print("Бот запущен!")
-    # Устанавливаем webhook в отдельном потоке
-    threading.Thread(target=set_webhook, daemon=True).start()
+    # Устанавливаем webhook
+    set_webhook()
     # Запускаем Flask на порту 8000
     app.run(host='0.0.0.0', port=8000)
