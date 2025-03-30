@@ -242,7 +242,7 @@ def webhook():
     if update.message:
         print(f"Сообщение: {update.message.text}, Chat ID: {update.message.chat.id}", flush=True)
         if update.message.text == '/check':
-            chat_id = update.message.chat.id
+            chat_id = '@SalePixel'
             threading.Thread(target=check_battlefield, args=(chat_id,), daemon=True).start()
     return 'OK', 200
 
