@@ -266,8 +266,12 @@ def run_schedule():
     print("Запускаю расписание...")
     schedule.every(1).hours.do(check_battlefield)
     while True:
-        schedule.run_pending()
-        time.sleep(1)
+        try:
+            schedule.run_pending()
+            time.sleep(1)
+        except Exception as e:
+            print(f"Ошибка в расписании: {e}")
+            time.sleep(60)  # Пауза перед повторной попыткой
 
 # Запуск
 if __name__ == "__main__":
@@ -279,6 +283,11 @@ if __name__ == "__main__":
         schedule_thread = threading.Thread(target=run_schedule, daemon=True)
         schedule_thread.start()
         print("Запускаю polling...")
-        bot.polling(none_stop=True, skip_pending=True)
+        while True:
+            try:
+                bot.polling(none_stop=True, skip_pending=True, interval=5)
+            except Exception as e:
+                print(f"Ошибка polling: {e}")
+                time.sleep(15)  # Перезапуск polling после ошибки
     except Exception as e:
-        print(f"Ошибка запуска: {e}")
+        print(f"Критическая ошибка запуска: {e}")
