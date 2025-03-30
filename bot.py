@@ -1,12 +1,10 @@
 import requests
-import schedule
-import time
-import threading
 from datetime import datetime
 import telebot
 import re
 from bs4 import BeautifulSoup
 from http.server import BaseHTTPRequestHandler, HTTPServer
+import threading
 
 # Токен бота
 TOKEN = '7790106263:AAHKNdO8yDrDbmZzoB8U64hMTNhPr0LkxrU'  # Замени на свой токен от BotFather
@@ -15,7 +13,7 @@ bot = telebot.TeleBot(TOKEN)
 # Чат для публикации
 CHAT_ID = '@SalePixel'  # Замени на свой канал
 
-# Хранилище для отслеживания уже опубликованных скидок
+# Хранилище для отслеживания скидок (сбрасывается при каждом запуске)
 posted_items = set()
 
 # Список Battlefield игр с их Steam ID
@@ -29,16 +27,24 @@ BATTLEFIELD_GAMES = {
 }
 
 # Keep-alive сервер для Render
-class KeepAliveHandler(BaseHTTPRequestHandler):
+class RequestHandler(BaseHTTPRequestHandler):
     def do_GET(self):
-        self.send_response(200)
-        self.send_header("Content-type", "text/plain")
-        self.end_headers()
-        self.wfile.write(b"OK")
+        if self.path == '/check':
+            # При получении запроса выполняем проверку
+            threading.Thread(target=check_battlefield, daemon=True).start()
+            self.send_response(200)
+            self.send_header("Content-type", "text/plain")
+            self.end_headers()
+            self.wfile.write(b"Checking Battlefield discounts...")
+        else:
+            self.send_response(200)
+            self.send_header("Content-type", "text/plain")
+            self.end_headers()
+            self.wfile.write(b"Bot is alive. Use /check in Telegram to trigger.")
 
 def run_keep_alive_server():
-    server = HTTPServer(('0.0.0.0', 8000), KeepAliveHandler)
-    print("Запущен keep-alive сервер на порту 8000...")
+    server = HTTPServer(('0.0.0.0', 8000), RequestHandler)
+    print("Запущен сервер на порту 8000...")
     server.serve_forever()
 
 # Steam: Скидки и раздачи
@@ -239,27 +245,11 @@ def check_battlefield():
                     print(f"Ошибка публикации: {e}")
                     bot.send_message(CHAT_ID, message)
                     posted_items.add(item_id)
-                time.sleep(3)
-
-# Расписание
-def run_schedule():
-    print("Бот запущен!")
-    print("Начинаю первую проверку...")
-    check_battlefield()  # Первая проверка сразу
-    print("Запускаю расписание...")
-    schedule.every(1).hours.do(check_battlefield)
-    while True:
-        try:
-            schedule.run_pending()
-            time.sleep(1)
-        except Exception as e:
-            print(f"Ошибка в расписании: {e}")
-            time.sleep(60)  # Пауза перед повторной попыткой
 
 # Запуск
 if __name__ == "__main__":
-    # Запуск keep-alive сервера в отдельном потоке
-    keep_alive_thread = threading.Thread(target=run_keep_alive_server, daemon=True)
-    keep_alive_thread.start()
-    # Запуск основного расписания
-    run_schedule()
+    print("Бот запущен!")
+    server_thread = threading.Thread(target=run_keep_alive_server, daemon=True)
+    server_thread.start()
+    # Бот остаётся активным, ожидая запросов на /check
+    server_thread.join()
