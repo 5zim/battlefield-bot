@@ -57,7 +57,7 @@ def get_steam_battlefield():
     print(f"Найдено в Steam: {len(discounts)}", flush=True)
     return discounts
 
-# EA App: Скидки и раздачи (упрощённый парсинг)
+# EA App: Скидки и раздачи
 def get_ea_battlefield():
     print("Проверяю Battlefield в EA App...", flush=True)
     discounts = []
@@ -70,25 +70,26 @@ def get_ea_battlefield():
         print(f"Получен ответ: Статус {response.status_code}", flush=True)
         if response.status_code == 200:
             soup = BeautifulSoup(response.text, 'html.parser')
-            # Ищем любые упоминания скидок
-            discount_elements = soup.find_all(text=re.compile(r'\d+%\s*off|\d+%\s*discount', re.I))
-            print(f"EA: Найдено упоминаний скидок: {len(discount_elements)}", flush=True)
-            for elem in discount_elements:
-                parent = elem.find_parent()
-                title = parent.find("h3") or parent.find("h2") or parent.find("h4")
+            # Ищем элементы с играми
+            game_elements = soup.find_all("div", class_=re.compile(r'game|product|tile|card'))
+            print(f"EA: Найдено элементов: {len(game_elements)}", flush=True)
+            for elem in game_elements:
+                title = elem.find("h3") or elem.find("h2") or elem.find("h4")
                 if title and "Battlefield" in title.text:
                     print(f"EA: Найдена игра: {title.text}", flush=True)
-                    discount = re.search(r'(\d+)%', elem)
-                    if discount:
-                        game_link = parent.find("a", href=True)
-                        game_url = f"https://www.ea.com{game_link['href']}" if game_link else "https://www.ea.com/games/battlefield"
-                        discounts.append({
-                            "id": f"ea_{title.text}",
-                            "name": title.text,
-                            "discount": int(discount.group(1)),
-                            "price": "Check on EA App",
-                            "url": game_url
-                        })
+                    discount_elem = elem.find(string=re.compile(r'\d+%\s*off|\d+%\s*discount', re.I))
+                    if discount_elem:
+                        discount = re.search(r'(\d+)%', discount_elem)
+                        if discount:
+                            game_link = elem.find("a", href=True)
+                            game_url = f"https://www.ea.com{game_link['href']}" if game_link else "https://www.ea.com/games/battlefield"
+                            discounts.append({
+                                "id": f"ea_{title.text}",
+                                "name": title.text,
+                                "discount": int(discount.group(1)),
+                                "price": "Check on EA App",
+                                "url": game_url
+                            })
     except Exception as e:
         print(f"Ошибка проверки EA: {e}", flush=True)
     print(f"Найдено в EA: {len(discounts)}", flush=True)
@@ -99,12 +100,14 @@ def get_epic_battlefield():
     print("Проверяю Battlefield в Epic Games...", flush=True)
     discounts = []
     try:
-        url = "https://store.epicgames.com/graphql?operationName=getStoreFreeGames&variables=%7B%22locale%22:%22en-US%22,%22country%22:%22US%22,%22allowCountries%22:%22US%22%7D&extensions=%7B%22persistedQuery%22:%7B%22version%22:1,%22sha256Hash%22:%22d5c1a5b6b5a1a5b6b5a1a5b6b5a1a5b6b5a1a5b6b5a1a5b6b5a1a5b6b5a1a5b6%22%7D%7D"
+        url = "https://store-site-backend-static-ipv4.ak.epicgames.com/freeGamesPromotions?locale=en-US&country=US&allowCountries=US"
         headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
         }
-        response = requests.get(url, headers=headers).json()
-        games = response["data"]["Catalog"]["catalogOffers"]["elements"]
+        response = requests.get(url, headers=headers)
+        print(f"Epic: Статус ответа: {response.status_code}", flush=True)
+        data = response.json()
+        games = data["data"]["Catalog"]["searchStore"]["elements"]
         print(f"Epic: Найдено игр: {len(games)}", flush=True)
         for game in games:
             title = game.get("title", "")
@@ -125,7 +128,7 @@ def get_epic_battlefield():
     print(f"Найдено раздач в Epic: {len(discounts)}", flush=True)
     return discounts
 
-# Prime Gaming: Скидки и раздачи (упрощённый парсинг)
+# Prime Gaming: Скидки и раздачи
 def get_prime_battlefield():
     print("Проверяю Battlefield в Prime Gaming...", flush=True)
     discounts = []
@@ -136,25 +139,26 @@ def get_prime_battlefield():
         }
         response = requests.get(url, headers=headers)
         soup = BeautifulSoup(response.text, 'html.parser')
-        # Ищем любые упоминания "free" или "claim"
-        free_elements = soup.find_all(text=re.compile(r'free|claim', re.I))
-        print(f"Prime: Найдено упоминаний free/claim: {len(free_elements)}", flush=True)
-        for elem in free_elements:
-            parent = elem.find_parent()
-            title = parent.find("h3") or parent.find("h2") or parent.find("h4")
+        # Ищем элементы с играми
+        game_elements = soup.find_all("div", class_=re.compile(r'item|offer|card|product'))
+        print(f"Prime: Найдено элементов: {len(game_elements)}", flush=True)
+        for elem in game_elements:
+            title = elem.find("h3") or elem.find("h2") or elem.find("h4")
             if title and "Battlefield" in title.text:
                 print(f"Prime: Найдена игра: {title.text}", flush=True)
-                game_link = parent.find("a", href=True)
-                game_url = game_link['href'] if game_link else "https://gaming.amazon.com/home"
-                if not game_url.startswith("http"):
-                    game_url = f"https://gaming.amazon.com{game_url}"
-                discounts.append({
-                    "id": f"prime_{title.text}",
-                    "name": title.text,
-                    "discount": 100,  # Бесплатно
-                    "price": "Free with Prime",
-                    "url": game_url
-                })
+                free_elem = elem.find(string=re.compile(r'free|claim', re.I))
+                if free_elem:
+                    game_link = elem.find("a", href=True)
+                    game_url = game_link['href'] if game_link else "https://gaming.amazon.com/home"
+                    if not game_url.startswith("http"):
+                        game_url = f"https://gaming.amazon.com{game_url}"
+                    discounts.append({
+                        "id": f"prime_{title.text}",
+                        "name": title.text,
+                        "discount": 100,  # Бесплатно
+                        "price": "Free with Prime",
+                        "url": game_url
+                    })
     except Exception as e:
         print(f"Ошибка проверки Prime: {e}", flush=True)
     print(f"Найдено в Prime Gaming: {len(discounts)}", flush=True)
