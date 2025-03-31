@@ -149,42 +149,4 @@ def check_battlefield(chat_id):
     all_discounts = (
         get_steam_battlefield() +
         get_ea_battlefield() +
-        get_epic_battlefield() +
-        get_prime_battlefield()
-    )
-    if not all_discounts:
-        bot.send_message(chat_id, "🔍 Пока Battlefield отдыхает от скидок и раздач. Солдаты, готовьте кошельки — ждём следующую атаку акций!")
-        print("Отправлено сообщение об отсутствии скидок", flush=True)
-    else:
-        for item in all_discounts:
-            item_id = item["id"]
-            if item_id not in posted_items:
-                message = (
-                    f"🎮 {item['name']}\n"
-                    f"🔥 Скидка: {item['discount']}%\n"
-                    f"💰 Цена: {item['price']}\n"
-                    f"🔗 [Купить]({item['url']})"
-                )
-                bot.send_message(chat_id, message, parse_mode="Markdown", disable_web_page_preview=True)
-                posted_items.add(item_id)
-                print(f"Опубликовано: {item['name']}", flush=True)
-
-# Корневой маршрут для проверки Render
-@app.route('/', methods=['GET'])
-def home():
-    print("Проверка корневого маршрута", flush=True)
-    return "Bot is alive. Use /check in Telegram to trigger.", 200
-
-# Обработка webhook-запросов от Telegram
-@app.route('/webhook', methods=['POST'])
-def webhook():
-    print("Получен запрос на /webhook", flush=True)
-    try:
-        data = request.get_json()
-        if not data:
-            print("Ошибка: Пустой JSON", flush=True)
-            return 'Bad Request', 400
-        print(f"Полученные данные: {data}", flush=True)
-        update = telebot.types.Update.de_json(data)
-        if not update:
-            print("Ошибка: Не удалось распарс
+        get_ep
