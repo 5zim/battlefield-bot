@@ -39,6 +39,7 @@ def get_steam_battlefield():
             response = requests.get(url).json()
             if response[app_id]["success"]:
                 data = response[app_id]["data"]
+                print(f"Steam: {game_name} - {data.get('price_overview', 'Нет данных о цене')}", flush=True)
                 if data.get("price_overview", {}).get("discount_percent", 0) > 0:
                     discount = {
                         "id": f"steam_{app_id}",
@@ -67,15 +68,18 @@ def get_ea_battlefield():
         if response.status_code == 200:
             soup = BeautifulSoup(response.text, 'html.parser')
             # Ищем секции с играми
-            games = soup.find_all("div", class_=re.compile(r'game-card|product-tile'))
+            games = soup.find_all("div", class_=re.compile(r'game|product|tile|card'))
+            print(f"EA: Найдено элементов: {len(games)}", flush=True)
             for game in games:
-                title = game.find("h3") or game.find("h2")
+                title = game.find("h3") or game.find("h2") or game.find("h4")
                 if title and "Battlefield" in title.text:
-                    discount_elem = game.find("span", class_=re.compile(r'discount|sale'))
+                    print(f"EA: Найдена игра: {title.text}", flush=True)
+                    discount_elem = game.find("span", class_=re.compile(r'discount|sale|off'))
                     if discount_elem:
                         discount_text = discount_elem.text
+                        print(f"EA: Скидка найдена: {discount_text}", flush=True)
                         discount = re.search(r'(\d+)%', discount_text)
-                        price_elem = game.find("span", class_=re.compile(r'price'))
+                        price_elem = game.find("span", class_=re.compile(r'price|cost'))
                         price = price_elem.text.strip() if price_elem else "Check on EA App"
                         if discount:
                             game_link = game.find("a", href=True)
@@ -103,8 +107,10 @@ def get_epic_battlefield():
         }
         response = requests.get(url, headers=headers).json()
         games = response["data"]["Catalog"]["searchStore"]["elements"]
+        print(f"Epic: Найдено игр: {len(games)}", flush=True)
         for game in games:
             if "Battlefield" in game["title"]:
+                print(f"Epic: Найдена игра: {game['title']}", flush=True)
                 price = game["price"]["totalPrice"]["discountPrice"]
                 if price == 0:  # Бесплатная раздача
                     product_slug = game.get("productSlug", game["urlSlug"])
@@ -132,10 +138,12 @@ def get_prime_battlefield():
         response = requests.get(url, headers=headers)
         soup = BeautifulSoup(response.text, 'html.parser')
         # Ищем игры
-        games = soup.find_all("div", class_=re.compile(r'item-card|offer-card'))
+        games = soup.find_all("div", class_=re.compile(r'item|offer|card|product'))
+        print(f"Prime: Найдено элементов: {len(games)}", flush=True)
         for game in games:
-            title = game.find("h3") or game.find("h2")
+            title = game.find("h3") or game.find("h2") or game.find("h4")
             if title and "Battlefield" in title.text:
+                print(f"Prime: Найдена игра: {title.text}", flush=True)
                 if "claim" in game.text.lower() or "free" in game.text.lower():
                     game_link = game.find("a", href=True)
                     game_url = game_link['href'] if game_link else "https://gaming.amazon.com/home"
