@@ -8,13 +8,6 @@ import threading
 import schedule
 import time
 import os
-from selenium import webdriver
-from selenium.webdriver.chrome.service import Service
-from selenium.webdriver.chrome.options import Options
-from webdriver_manager.chrome import ChromeDriverManager
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
 
 # Токен бота
 TOKEN = os.getenv('TELEGRAM_TOKEN')  # Токен из переменной окружения Render
@@ -23,15 +16,15 @@ bot = telebot.TeleBot(TOKEN)
 # Чат для публикации
 CHAT_ID = '@SalePixel'  # Твой канал
 
-# Список Battlefield игр с их Steam ID
-BATTLEFIELD_GAMES = {
-    "Battlefield 1": "1237600",
-    "Battlefield V": "1238810",
-    "Battlefield 2042": "1517290",
-    "Battlefield 4": "1238860",
-    "Battlefield 3": "1238820",
-    "Battlefield Hardline": "1238880"
-}
+# Список Battlefield игр для поиска
+BATTLEFIELD_TITLES = [
+    "Battlefield 1",
+    "Battlefield V",
+    "Battlefield 2042",
+    "Battlefield 4",
+    "Battlefield 3",
+    "Battlefield Hardline"
+]
 
 # Flask приложение
 app = Flask(__name__)
@@ -39,82 +32,40 @@ app = Flask(__name__)
 # Хранилище для отслеживания скидок
 posted_items = set()
 
-# Настройка Selenium
-def setup_driver():
-    chrome_options = Options()
-    chrome_options.add_argument("--headless")
-    chrome_options.add_argument("--no-sandbox")
-    chrome_options.add_argument("--disable-dev-shm-usage")
-    driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
-    return driver
-
-# Steam: Скидки и раздачи
-def get_steam_battlefield():
-    print("Проверяю Battlefield в Steam...", flush=True)
+# CheapShark API: Скидки на игры
+def get_cheapshark_deals():
+    print("Проверяю скидки через CheapShark API...", flush=True)
     discounts = []
     try:
-        for game_name, app_id in BATTLEFIELD_GAMES.items():
-            url = f"https://store.steampowered.com/api/appdetails?appids={app_id}"
-            response = requests.get(url).json()
-            if response[app_id]["success"]:
-                data = response[app_id]["data"]
-                print(f"Steam: {game_name} - {data.get('price_overview', 'Нет данных о цене')}", flush=True)
-                if data.get("price_overview", {}).get("discount_percent", 0) > 0:
-                    discount = {
-                        "id": f"steam_{app_id}",
-                        "name": game_name,
-                        "discount": data["price_overview"]["discount_percent"],
-                        "price": data["price_overview"]["final_formatted"],
-                        "url": f"https://store.steampowered.com/app/{app_id}"
-                    }
-                    discounts.append(discount)
-    except Exception as e:
-        print(f"Ошибка проверки Steam: {e}", flush=True)
-    print(f"Найдено в Steam: {len(discounts)}", flush=True)
-    return discounts
+        # Получаем список магазинов
+        stores_url = "https://www.cheapshark.com/api/1.0/stores"
+        stores_response = requests.get(stores_url).json()
+        store_map = {store["storeID"]: store["storeName"] for store in stores_response}
+        print(f"CheapShark: Найдено магазинов: {len(store_map)}", flush=True)
 
-# EA App: Скидки и раздачи (с использованием Selenium)
-def get_ea_battlefield():
-    print("Проверяю Battlefield в EA App с помощью Selenium...", flush=True)
-    discounts = []
-    driver = None
-    try:
-        driver = setup_driver()
-        url = "https://www.ea.com/games/battlefield"
-        driver.get(url)
-        # Ждём загрузки элементов
-        WebDriverWait(driver, 15).until(
-            EC.presence_of_element_located((By.TAG_NAME, "body"))
-        )
-        # Получаем HTML после выполнения JavaScript
-        soup = BeautifulSoup(driver.page_source, 'html.parser')
-        # Ищем элементы с играми
-        game_elements = soup.find_all("div", class_=re.compile(r'game|product|tile|card|ea-play-game|content'))
-        print(f"EA: Найдено элементов: {len(game_elements)}", flush=True)
-        for elem in game_elements:
-            title = elem.find("h3") or elem.find("h2") or elem.find("h4") or elem.find("span", class_=re.compile(r'title|name'))
-            if title and "Battlefield" in title.text:
-                print(f"EA: Найдена игра: {title.text}", flush=True)
-                discount_elem = elem.find(string=re.compile(r'\d+%\s*off|\d+%\s*discount|sale|deal', re.I))
-                if discount_elem:
-                    print(f"EA: Найдена скидка: {discount_elem}", flush=True)
-                    discount = re.search(r'(\d+)%', discount_elem)
-                    if discount:
-                        game_link = elem.find("a", href=True)
-                        game_url = f"https://www.ea.com{game_link['href']}" if game_link else "https://www.ea.com/games/battlefield"
+        # Ищем скидки на Battlefield
+        for title in BATTLEFIELD_TITLES:
+            deals_url = f"https://www.cheapshark.com/api/1.0/deals?title={title}&sortBy=Price"
+            response = requests.get(deals_url).json()
+            for deal in response:
+                if "Battlefield" in deal["title"]:
+                    store_id = deal["storeID"]
+                    store_name = store_map.get(store_id, "Unknown Store")
+                    discount_percent = round(float(deal["savings"]))
+                    if discount_percent > 0:  # Только если есть скидка
+                        deal_id = deal["dealID"]
                         discounts.append({
-                            "id": f"ea_{title.text}",
-                            "name": title.text,
-                            "discount": int(discount.group(1)),
-                            "price": "Check on EA App",
-                            "url": game_url
+                            "id": f"cheapshark_{deal_id}",
+                            "name": deal["title"],
+                            "discount": discount_percent,
+                            "price": f"${deal['salePrice']}",
+                            "url": f"https://www.cheapshark.com/redirect?dealID={deal_id}",
+                            "store": store_name
                         })
+                        print(f"CheapShark: Найдена скидка: {deal['title']} - {discount_percent}% в {store_name}", flush=True)
     except Exception as e:
-        print(f"Ошибка проверки EA: {e}", flush=True)
-    finally:
-        if driver:
-            driver.quit()
-    print(f"Найдено в EA: {len(discounts)}", flush=True)
+        print(f"Ошибка проверки CheapShark: {e}", flush=True)
+    print(f"Найдено скидок через CheapShark: {len(discounts)}", flush=True)
     return discounts
 
 # Epic Games: Только бесплатные раздачи
@@ -143,54 +94,40 @@ def get_epic_battlefield():
                         "name": title,
                         "discount": 100,  # Бесплатно = 100% скидка
                         "price": "Free",
-                        "url": f"https://www.epicgames.com/store/en-US/p/{product_slug}"
+                        "url": f"https://www.epicgames.com/store/en-US/p/{product_slug}",
+                        "store": "Epic Games"
                     })
     except Exception as e:
         print(f"Ошибка проверки Epic: {e}", flush=True)
     print(f"Найдено раздач в Epic: {len(discounts)}", flush=True)
     return discounts
 
-# Prime Gaming: Скидки и раздачи (с использованием Selenium)
+# Prime Gaming: Парсинг через RSS или другой источник
 def get_prime_battlefield():
-    print("Проверяю Battlefield в Prime Gaming с помощью Selenium...", flush=True)
+    print("Проверяю Battlefield в Prime Gaming через RSS...", flush=True)
     discounts = []
-    driver = None
     try:
-        driver = setup_driver()
-        url = "https://gaming.amazon.com/home"
-        driver.get(url)
-        # Ждём загрузки элементов
-        WebDriverWait(driver, 15).until(
-            EC.presence_of_element_located((By.TAG_NAME, "body"))
-        )
-        # Получаем HTML после выполнения JavaScript
-        soup = BeautifulSoup(driver.page_source, 'html.parser')
-        # Ищем элементы с играми
-        game_elements = soup.find_all("div", class_=re.compile(r'item|offer|card|product|game|content'))
-        print(f"Prime: Найдено элементов: {len(game_elements)}", flush=True)
-        for elem in game_elements:
-            title = elem.find("h3") or elem.find("h2") or elem.find("h4") or elem.find("span", class_=re.compile(r'title|name'))
-            if title and "Battlefield" in title.text:
-                print(f"Prime: Найдена игра: {title.text}", flush=True)
-                free_elem = elem.find(string=re.compile(r'free|claim|gratis|prime', re.I))
-                if free_elem:
-                    print(f"Prime: Найдено упоминание free/claim: {free_elem}", flush=True)
-                    game_link = elem.find("a", href=True)
-                    game_url = game_link['href'] if game_link else "https://gaming.amazon.com/home"
-                    if not game_url.startswith("http"):
-                        game_url = f"https://gaming.amazon.com{game_url}"
-                    discounts.append({
-                        "id": f"prime_{title.text}",
-                        "name": title.text,
-                        "discount": 100,  # Бесплатно
-                        "price": "Free with Prime",
-                        "url": game_url
-                    })
+        # Используем RSS-ленту или другой источник (например, GamingOnLinux)
+        url = "https://www.gamingonlinux.com/feeds/rss/"  # Пример RSS-ленты
+        response = requests.get(url)
+        soup = BeautifulSoup(response.content, 'xml')
+        items = soup.find_all("item")
+        print(f"Prime: Найдено элементов в RSS: {len(items)}", flush=True)
+        for item in items:
+            title = item.find("title").text if item.find("title") else ""
+            if "Battlefield" in title and "Prime Gaming" in title:
+                print(f"Prime: Найдена игра: {title}", flush=True)
+                link = item.find("link").text if item.find("link") else "https://gaming.amazon.com/home"
+                discounts.append({
+                    "id": f"prime_{title}",
+                    "name": title,
+                    "discount": 100,  # Бесплатно
+                    "price": "Free with Prime",
+                    "url": link,
+                    "store": "Prime Gaming"
+                })
     except Exception as e:
         print(f"Ошибка проверки Prime: {e}", flush=True)
-    finally:
-        if driver:
-            driver.quit()
     print(f"Найдено в Prime Gaming: {len(discounts)}", flush=True)
     return discounts
 
@@ -198,8 +135,7 @@ def get_prime_battlefield():
 def check_battlefield(chat_id):
     print("Запускаю проверку Battlefield...", flush=True)
     all_discounts = (
-        get_steam_battlefield() +
-        get_ea_battlefield() +
+        get_cheapshark_deals() +
         get_epic_battlefield() +
         get_prime_battlefield()
     )
@@ -214,6 +150,7 @@ def check_battlefield(chat_id):
                     f"🎮 {item['name']}\n"
                     f"🔥 Скидка: {item['discount']}%\n"
                     f"💰 Цена: {item['price']}\n"
+                    f"🏪 Магазин: {item['store']}\n"
                     f"🔗 [Купить]({item['url']})"
                 )
                 bot.send_message(chat_id, message, parse_mode="Markdown", disable_web_page_preview=True)
