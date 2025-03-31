@@ -83,20 +83,21 @@ def get_ea_battlefield():
         url = "https://www.ea.com/games/battlefield"
         driver.get(url)
         # Ждём загрузки элементов
-        WebDriverWait(driver, 10).until(
+        WebDriverWait(driver, 15).until(
             EC.presence_of_element_located((By.TAG_NAME, "body"))
         )
         # Получаем HTML после выполнения JavaScript
         soup = BeautifulSoup(driver.page_source, 'html.parser')
         # Ищем элементы с играми
-        game_elements = soup.find_all("div", class_=re.compile(r'game|product|tile|card'))
+        game_elements = soup.find_all("div", class_=re.compile(r'game|product|tile|card|ea-play-game|content'))
         print(f"EA: Найдено элементов: {len(game_elements)}", flush=True)
         for elem in game_elements:
-            title = elem.find("h3") or elem.find("h2") or elem.find("h4")
+            title = elem.find("h3") or elem.find("h2") or elem.find("h4") or elem.find("span", class_=re.compile(r'title|name'))
             if title and "Battlefield" in title.text:
                 print(f"EA: Найдена игра: {title.text}", flush=True)
-                discount_elem = elem.find(string=re.compile(r'\d+%\s*off|\d+%\s*discount', re.I))
+                discount_elem = elem.find(string=re.compile(r'\d+%\s*off|\d+%\s*discount|sale|deal', re.I))
                 if discount_elem:
+                    print(f"EA: Найдена скидка: {discount_elem}", flush=True)
                     discount = re.search(r'(\d+)%', discount_elem)
                     if discount:
                         game_link = elem.find("a", href=True)
@@ -159,20 +160,21 @@ def get_prime_battlefield():
         url = "https://gaming.amazon.com/home"
         driver.get(url)
         # Ждём загрузки элементов
-        WebDriverWait(driver, 10).until(
+        WebDriverWait(driver, 15).until(
             EC.presence_of_element_located((By.TAG_NAME, "body"))
         )
         # Получаем HTML после выполнения JavaScript
         soup = BeautifulSoup(driver.page_source, 'html.parser')
         # Ищем элементы с играми
-        game_elements = soup.find_all("div", class_=re.compile(r'item|offer|card|product'))
+        game_elements = soup.find_all("div", class_=re.compile(r'item|offer|card|product|game|content'))
         print(f"Prime: Найдено элементов: {len(game_elements)}", flush=True)
         for elem in game_elements:
-            title = elem.find("h3") or elem.find("h2") or elem.find("h4")
+            title = elem.find("h3") or elem.find("h2") or elem.find("h4") or elem.find("span", class_=re.compile(r'title|name'))
             if title and "Battlefield" in title.text:
                 print(f"Prime: Найдена игра: {title.text}", flush=True)
-                free_elem = elem.find(string=re.compile(r'free|claim', re.I))
+                free_elem = elem.find(string=re.compile(r'free|claim|gratis|prime', re.I))
                 if free_elem:
+                    print(f"Prime: Найдено упоминание free/claim: {free_elem}", flush=True)
                     game_link = elem.find("a", href=True)
                     game_url = game_link['href'] if game_link else "https://gaming.amazon.com/home"
                     if not game_url.startswith("http"):
