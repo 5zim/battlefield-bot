@@ -271,3 +271,18 @@ if __name__ == "__main__":
     print("Бот запущен!", flush=True)
     set_webhook()
     app.run(host='0.0.0.0', port=8000)
+
+import schedule
+import time
+
+def run_schedule():
+    while True:
+        schedule.run_pending()
+        time.sleep(60)
+
+if __name__ == "__main__":
+    print("Бот запущен!", flush=True)
+    schedule.every().day.at("12:00").do(check_battlefield, chat_id='@SalePixel')
+    threading.Thread(target=run_schedule, daemon=True).start()
+    set_webhook()
+    app.run(host='0.0.0.0', port=8000)
