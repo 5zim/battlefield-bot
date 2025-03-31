@@ -142,4 +142,5 @@ if __name__ == "__main__":
     schedule.every().day.at("12:00").do(check_battlefield, chat_id='@SalePixel')  # Ежедневно в 12:00 UTC
     threading.Thread(target=run_schedule, daemon=True).start()
     set_webhook()
-    app.run(host='0.0.0.0', port=8000)
+    port = int(os.getenv('PORT', 8000))  # Бери порт из переменной окружения, по умолчанию 8000
+app.run(host='0.0.0.0', port=port)
