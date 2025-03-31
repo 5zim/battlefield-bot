@@ -1,9 +1,7 @@
 name: Daily Battlefield Check
-
 on:
   schedule:
     - cron: '*/5 * * * *'  # Каждые 5 минут
-
 jobs:
   wake-bot:
     runs-on: ubuntu-latest
