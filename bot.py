@@ -8,6 +8,13 @@ import threading
 import schedule
 import time
 import os
+from selenium import webdriver
+from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.chrome.options import Options
+from webdriver_manager.chrome import ChromeDriverManager
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 
 # Токен бота
 TOKEN = os.getenv('TELEGRAM_TOKEN')  # Токен из переменной окружения Render
@@ -31,6 +38,15 @@ app = Flask(__name__)
 
 # Хранилище для отслеживания скидок
 posted_items = set()
+
+# Настройка Selenium
+def setup_driver():
+    chrome_options = Options()
+    chrome_options.add_argument("--headless")
+    chrome_options.add_argument("--no-sandbox")
+    chrome_options.add_argument("--disable-dev-shm-usage")
+    driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
+    return driver
 
 # Steam: Скидки и раздачи
 def get_steam_battlefield():
@@ -57,41 +73,46 @@ def get_steam_battlefield():
     print(f"Найдено в Steam: {len(discounts)}", flush=True)
     return discounts
 
-# EA App: Скидки и раздачи
+# EA App: Скидки и раздачи (с использованием Selenium)
 def get_ea_battlefield():
-    print("Проверяю Battlefield в EA App...", flush=True)
+    print("Проверяю Battlefield в EA App с помощью Selenium...", flush=True)
     discounts = []
+    driver = None
     try:
+        driver = setup_driver()
         url = "https://www.ea.com/games/battlefield"
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
-        }
-        response = requests.get(url, headers=headers)
-        print(f"Получен ответ: Статус {response.status_code}", flush=True)
-        if response.status_code == 200:
-            soup = BeautifulSoup(response.text, 'html.parser')
-            # Ищем элементы с играми
-            game_elements = soup.find_all("div", class_=re.compile(r'game|product|tile|card'))
-            print(f"EA: Найдено элементов: {len(game_elements)}", flush=True)
-            for elem in game_elements:
-                title = elem.find("h3") or elem.find("h2") or elem.find("h4")
-                if title and "Battlefield" in title.text:
-                    print(f"EA: Найдена игра: {title.text}", flush=True)
-                    discount_elem = elem.find(string=re.compile(r'\d+%\s*off|\d+%\s*discount', re.I))
-                    if discount_elem:
-                        discount = re.search(r'(\d+)%', discount_elem)
-                        if discount:
-                            game_link = elem.find("a", href=True)
-                            game_url = f"https://www.ea.com{game_link['href']}" if game_link else "https://www.ea.com/games/battlefield"
-                            discounts.append({
-                                "id": f"ea_{title.text}",
-                                "name": title.text,
-                                "discount": int(discount.group(1)),
-                                "price": "Check on EA App",
-                                "url": game_url
-                            })
+        driver.get(url)
+        # Ждём загрузки элементов
+        WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located((By.TAG_NAME, "body"))
+        )
+        # Получаем HTML после выполнения JavaScript
+        soup = BeautifulSoup(driver.page_source, 'html.parser')
+        # Ищем элементы с играми
+        game_elements = soup.find_all("div", class_=re.compile(r'game|product|tile|card'))
+        print(f"EA: Найдено элементов: {len(game_elements)}", flush=True)
+        for elem in game_elements:
+            title = elem.find("h3") or elem.find("h2") or elem.find("h4")
+            if title and "Battlefield" in title.text:
+                print(f"EA: Найдена игра: {title.text}", flush=True)
+                discount_elem = elem.find(string=re.compile(r'\d+%\s*off|\d+%\s*discount', re.I))
+                if discount_elem:
+                    discount = re.search(r'(\d+)%', discount_elem)
+                    if discount:
+                        game_link = elem.find("a", href=True)
+                        game_url = f"https://www.ea.com{game_link['href']}" if game_link else "https://www.ea.com/games/battlefield"
+                        discounts.append({
+                            "id": f"ea_{title.text}",
+                            "name": title.text,
+                            "discount": int(discount.group(1)),
+                            "price": "Check on EA App",
+                            "url": game_url
+                        })
     except Exception as e:
         print(f"Ошибка проверки EA: {e}", flush=True)
+    finally:
+        if driver:
+            driver.quit()
     print(f"Найдено в EA: {len(discounts)}", flush=True)
     return discounts
 
@@ -128,17 +149,21 @@ def get_epic_battlefield():
     print(f"Найдено раздач в Epic: {len(discounts)}", flush=True)
     return discounts
 
-# Prime Gaming: Скидки и раздачи
+# Prime Gaming: Скидки и раздачи (с использованием Selenium)
 def get_prime_battlefield():
-    print("Проверяю Battlefield в Prime Gaming...", flush=True)
+    print("Проверяю Battlefield в Prime Gaming с помощью Selenium...", flush=True)
     discounts = []
+    driver = None
     try:
+        driver = setup_driver()
         url = "https://gaming.amazon.com/home"
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
-        }
-        response = requests.get(url, headers=headers)
-        soup = BeautifulSoup(response.text, 'html.parser')
+        driver.get(url)
+        # Ждём загрузки элементов
+        WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located((By.TAG_NAME, "body"))
+        )
+        # Получаем HTML после выполнения JavaScript
+        soup = BeautifulSoup(driver.page_source, 'html.parser')
         # Ищем элементы с играми
         game_elements = soup.find_all("div", class_=re.compile(r'item|offer|card|product'))
         print(f"Prime: Найдено элементов: {len(game_elements)}", flush=True)
@@ -161,6 +186,9 @@ def get_prime_battlefield():
                     })
     except Exception as e:
         print(f"Ошибка проверки Prime: {e}", flush=True)
+    finally:
+        if driver:
+            driver.quit()
     print(f"Найдено в Prime Gaming: {len(discounts)}", flush=True)
     return discounts
 
