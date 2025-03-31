@@ -3,3 +3,5 @@ requests
 schedule
 beautifulsoup4
 flask
+selenium
+webdriver-manager
