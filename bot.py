@@ -7,7 +7,8 @@ from flask import Flask, request
 import threading
 
 # Токен бота
-TOKEN = '7790106263:AAHKNdO8yDrDbmZzoB8U64hMTNhPr0LkxrU'  # Замени на токен @ValBest_Bot
+import os
+TOKEN = os.getenv('TELEGRAM_TOKEN')  # Замени на токен @ValBest_Bot
 bot = telebot.TeleBot(TOKEN)
 
 # Чат для публикации
