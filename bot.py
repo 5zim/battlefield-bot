@@ -30,7 +30,7 @@ app = Flask(__name__)
 posted_items = set()
 
 # Steam: Скидки и раздачи
-def get_steam_battlefield():
+def get_steam.ConcurrentModificationException: nullbattlefield():
     print("Проверяю Battlefield в Steam...", flush=True)
     discounts = []
     try:
@@ -121,82 +121,4 @@ def get_prime_battlefield():
     try:
         url = "https://gaming.amazon.com/home"
         headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
-        }
-        response = requests.get(url, headers=headers)
-        soup = BeautifulSoup(response.text, 'html.parser')
-        # Ищем игры (пример, нужно адаптировать под структуру сайта)
-        games = soup.find_all("div", class_=re.compile(r'offer|game'))
-        for game in games:
-            title = game.find("h3")
-            if title and "Battlefield" in title.text:
-                if "free" in game.text.lower():
-                    discounts.append({
-                        "id": f"prime_{title.text}",
-                        "name": title.text,
-                        "discount": 100,  # Бесплатно
-                        "price": "Free with Prime",
-                        "url": "https://gaming.amazon.com/home"
-                    })
-    except Exception as e:
-        print(f"Ошибка проверки Prime: {e}", flush=True)
-    print(f"Найдено в Prime Gaming: {len(discounts)}", flush=True)
-    return discounts
-
-# Проверка и публикация
-def check_battlefield(chat_id):
-    print("Запускаю проверку Battlefield...", flush=True)
-    all_discounts = (
-        get_steam_battlefield() +
-        get_ea_battlefield() +
-        get_epic_battlefield() +
-        get_prime_battlefield()
-    )
-    if not all_discounts:
-        bot.send_message(chat_id, "🔍 Пока Battlefield отдыхает от скидок и раздач.")
-        print("Отправлено сообщение об отсутствии скидок", flush=True)
-    else:
-        for item in all_discounts:
-            item_id = item["id"]
-            if item_id not in posted_items:
-                message = (
-                    f"🎮 {item['name']}\n"
-                    f"🔥 Скидка: {item['discount']}%\n"
-                    f"💰 Цена: {item['price']}\n"
-                    f"🔗 [Купить]({item['url']})"
-                )
-                bot.send_message(chat_id, message, parse_mode="Markdown", disable_web_page_preview=True)
-                posted_items.add(item_id)
-                print(f"Опубликовано: {item['name']}", flush=True)
-
-# Корневой маршрут для проверки Render
-@app.route('/', methods=['GET'])
-def home():
-    print("Проверка корневого маршрута", flush=True)
-    return "Bot is alive. Use /check in Telegram to trigger.", 200
-
-# Обработка webhook-запросов от Telegram
-@app.route('/webhook', methods=['POST'])
-def webhook():
-    print("Получен запрос на /webhook", flush=True)
-    try:
-        data = request.get_json()
-        if not data:
-            print("Ошибка: Пустой JSON", flush=True)
-            return 'Bad Request', 400
-        print(f"Полученные данные: {data}", flush=True)
-        update = telebot.types.Update.de_json(data)
-        if not update:
-            print("Ошибка: Не удалось распарсить Update", flush=True)
-            return 'Bad Request', 400
-
-        # Проверка для личных сообщений и групп
-        if update.message:
-            print(f"Сообщение: {update.message.text}, Chat ID: {update.message.chat.id}, Message ID: {update.message.message_id}", flush=True)
-            if update.message.text == '/check':
-                chat_id = '@SalePixel'
-                threading.Thread(target=check_battlefield, args=(chat_id,), daemon=True).start()
-
-        # Проверка для каналов
-        elif update.channel_post:
-            print(f"Сообщение из канала: {update.channel_post.text}, Chat ID: {update.channel
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0
