@@ -1,0 +1,15 @@
+name: Daily Battlefield Check
+
+on:
+  schedule:
+    - cron: '0 12 * * *'  # Каждый день в 12:00 UTC
+
+jobs:
+  wake-bot:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send POST to Webhook
+        run: |
+          curl -X POST https://battlefield-bot.onrender.com/webhook \
+          -H "Content-Type: application/json" \
+          -d '{"update_id":123,"message":{"chat":{"id":52865990,"type":"private"},"text":"/check"}}'
