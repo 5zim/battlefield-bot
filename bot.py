@@ -82,7 +82,7 @@ def check_battlefield(chat_id):
         get_prime_battlefield()
     )
     if not all_discounts:
-        bot.send_message(chat_id, "🔍 Пока Battlefield отдыхает от скидок и раздач. Солдаты, готовьте кошельки — ждём следующую атаку акций!")
+        bot.send_message(chat_id, "🔍 Пока Battlefield отдыхает от скидок и раздач.")
         print("Отправлено сообщение об отсутствии скидок", flush=True)
     else:
         for item in all_discounts:
