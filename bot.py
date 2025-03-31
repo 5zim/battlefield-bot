@@ -36,6 +36,7 @@ posted_items = set()
 def get_cheapshark_deals():
     print("Проверяю скидки через CheapShark API...", flush=True)
     discounts = []
+    seen_deals = set()  # Для фильтрации дубликатов
     try:
         # Получаем список магазинов
         stores_url = "https://www.cheapshark.com/api/1.0/stores"
@@ -53,16 +54,19 @@ def get_cheapshark_deals():
                     store_name = store_map.get(store_id, "Unknown Store")
                     discount_percent = round(float(deal["savings"]))
                     if discount_percent > 0:  # Только если есть скидка
-                        deal_id = deal["dealID"]
-                        discounts.append({
-                            "id": f"cheapshark_{deal_id}",
-                            "name": deal["title"],
-                            "discount": discount_percent,
-                            "price": f"${deal['salePrice']}",
-                            "url": f"https://www.cheapshark.com/redirect?dealID={deal_id}",
-                            "store": store_name
-                        })
-                        print(f"CheapShark: Найдена скидка: {deal['title']} - {discount_percent}% в {store_name}", flush=True)
+                        deal_key = f"{deal['title']}_{store_name}_{discount_percent}"  # Уникальный ключ для фильтрации
+                        if deal_key not in seen_deals:
+                            seen_deals.add(deal_key)
+                            deal_id = deal["dealID"]
+                            discounts.append({
+                                "id": f"cheapshark_{deal_id}",
+                                "name": deal["title"],
+                                "discount": discount_percent,
+                                "price": f"${deal['salePrice']}",
+                                "url": f"https://www.cheapshark.com/redirect?dealID={deal_id}",
+                                "store": store_name
+                            })
+                            print(f"CheapShark: Найдена скидка: {deal['title']} - {discount_percent}% в {store_name}", flush=True)
     except Exception as e:
         print(f"Ошибка проверки CheapShark: {e}", flush=True)
     print(f"Найдено скидок через CheapShark: {len(discounts)}", flush=True)
@@ -102,15 +106,15 @@ def get_epic_battlefield():
     print(f"Найдено раздач в Epic: {len(discounts)}", flush=True)
     return discounts
 
-# Prime Gaming: Парсинг через RSS или другой источник
+# Prime Gaming: Парсинг через RSS
 def get_prime_battlefield():
     print("Проверяю Battlefield в Prime Gaming через RSS...", flush=True)
     discounts = []
     try:
-        # Используем RSS-ленту или другой источник (например, GamingOnLinux)
-        url = "https://www.gamingonlinux.com/feeds/rss/"  # Пример RSS-ленты
+        # Используем RSS-ленту (GamingOnLinux)
+        url = "https://www.gamingonlinux.com/feeds/rss/"
         response = requests.get(url)
-        soup = BeautifulSoup(response.content, 'xml')
+        soup = BeautifulSoup(response.content, 'xml', features='lxml')
         items = soup.find_all("item")
         print(f"Prime: Найдено элементов в RSS: {len(items)}", flush=True)
         for item in items:
