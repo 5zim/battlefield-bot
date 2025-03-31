@@ -10,4 +10,4 @@ jobs:
         run: |
           curl -X POST https://battlefield-bot.onrender.com/webhook \
           -H "Content-Type: application/json" \
-          -d '{"update_id":123,"message":{"chat":{"id":52865990,"type":"private"},"text":"/check"}}'
+          -d '{"update_id":123,"message":{"message_id":1,"chat":{"id":52865990,"type":"private"},"date":1696118400,"text":"/check"}}'
