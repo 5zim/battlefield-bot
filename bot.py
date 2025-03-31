@@ -30,7 +30,7 @@ app = Flask(__name__)
 posted_items = set()
 
 # Steam: Скидки и раздачи
-def get_steam.ConcurrentModificationException: nullbattlefield():
+def get_steam_battlefield():
     print("Проверяю Battlefield в Steam...", flush=True)
     discounts = []
     try:
@@ -187,49 +187,4 @@ def webhook():
         print(f"Полученные данные: {data}", flush=True)
         update = telebot.types.Update.de_json(data)
         if not update:
-            print("Ошибка: Не удалось распарсить Update", flush=True)
-            return 'Bad Request', 400
-
-        # Проверка для личных сообщений и групп
-        if update.message:
-            print(f"Сообщение: {update.message.text}, Chat ID: {update.message.chat.id}, Message ID: {update.message.message_id}", flush=True)
-            if update.message.text == '/check':
-                chat_id = '@SalePixel'
-                threading.Thread(target=check_battlefield, args=(chat_id,), daemon=True).start()
-
-        # Проверка для каналов
-        elif update.channel_post:
-            print(f"Сообщение из канала: {update.channel_post.text}, Chat ID: {update.channel_post.chat.id}", flush=True)
-            if update.channel_post.text == '/check':
-                chat_id = '@SalePixel'
-                threading.Thread(target=check_battlefield, args=(chat_id,), daemon=True).start()
-
-        return 'OK', 200
-    except Exception as e:
-        print(f"Ошибка в webhook: {e}", flush=True)
-        return 'Error', 500
-
-# Установка webhook при запуске
-def set_webhook():
-    webhook_url = 'https://battlefield-bot.onrender.com/webhook'
-    try:
-        bot.remove_webhook()
-        bot.set_webhook(url=webhook_url)
-        print(f"Webhook установлен: {webhook_url}", flush=True)
-    except Exception as e:
-        print(f"Ошибка установки webhook: {e}", flush=True)
-
-# Функция для расписания
-def run_schedule():
-    while True:
-        schedule.run_pending()
-        time.sleep(60)
-
-# Запуск
-if __name__ == "__main__":
-    print("Бот запущен!", flush=True)
-    schedule.every().day.at("12:00").do(check_battlefield, chat_id='@SalePixel')  # Ежедневно в 12:00 UTC
-    threading.Thread(target=run_schedule, daemon=True).start()
-    set_webhook()
-    port = int(os.getenv('PORT', 8000))
-    app.run(host='0.0.0.0', port=port)
+            print("Ошибка: Не удалось распарс
