@@ -102,23 +102,35 @@ def home():
 @app.route('/webhook', methods=['POST'])
 def webhook():
     print("Получен запрос на /webhook", flush=True)
-    update = telebot.types.Update.de_json(request.get_json())
-    
-    # Проверка для личных сообщений и групп
-    if update.message:
-        print(f"Сообщение: {update.message.text}, Chat ID: {update.message.chat.id}", flush=True)
-        if update.message.text == '/check':
-            chat_id = '@SalePixel'
-            threading.Thread(target=check_battlefield, args=(chat_id,), daemon=True).start()
-    
-    # Проверка для каналов
-    elif update.channel_post:
-        print(f"Сообщение из канала: {update.channel_post.text}, Chat ID: {update.channel_post.chat.id}", flush=True)
-        if update.channel_post.text == '/check':
-            chat_id = '@SalePixel'
-            threading.Thread(target=check_battlefield, args=(chat_id,), daemon=True).start()
-    
-    return 'OK', 200
+    try:
+        data = request.get_json()
+        if not data:
+            print("Ошибка: Пустой JSON", flush=True)
+            return 'Bad Request', 400
+        print(f"Полученные данные: {data}", flush=True)
+        update = telebot.types.Update.de_json(data)
+        if not update:
+            print("Ошибка: Не удалось распарсить Update", flush=True)
+            return 'Bad Request', 400
+
+        # Проверка для личных сообщений и групп
+        if update.message:
+            print(f"Сообщение: {update.message.text}, Chat ID: {update.message.chat.id}", flush=True)
+            if update.message.text == '/check':
+                chat_id = '@SalePixel'
+                threading.Thread(target=check_battlefield, args=(chat_id,), daemon=True).start()
+
+        # Проверка для каналов
+        elif update.channel_post:
+            print(f"Сообщение из канала: {update.channel_post.text}, Chat ID: {update.channel_post.chat.id}", flush=True)
+            if update.channel_post.text == '/check':
+                chat_id = '@SalePixel'
+                threading.Thread(target=check_battlefield, args=(chat_id,), daemon=True).start()
+
+        return 'OK', 200
+    except Exception as e:
+        print(f"Ошибка в webhook: {e}", flush=True)
+        return 'Error', 500
 
 # Установка webhook при запуске
 def set_webhook():
