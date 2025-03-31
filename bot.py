@@ -115,7 +115,7 @@ def webhook():
 
         # Проверка для личных сообщений и групп
         if update.message:
-            print(f"Сообщение: {update.message.text}, Chat ID: {update.message.chat.id}", flush=True)
+            print(f"Сообщение: {update.message.text}, Chat ID: {update.message.chat.id}, Message ID: {update.message.message_id}", flush=True)
             if update.message.text == '/check':
                 chat_id = '@SalePixel'
                 threading.Thread(target=check_battlefield, args=(chat_id,), daemon=True).start()
