@@ -2,7 +2,7 @@ name: Daily Battlefield Check
 
 on:
   schedule:
-    - cron: '0 12 * * *'  # Каждый день в 12:00 UTC
+    - cron: '*/5 * * * *'  # Каждые 5 минут
 
 jobs:
   wake-bot:
