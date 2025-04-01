@@ -112,10 +112,10 @@ def get_prime_battlefield():
     print("Проверяю Battlefield в Prime Gaming через RSS... 📢", flush=True)
     discounts = []
     try:
-        # Используем RSS-ленту от PC Gamer (замени на другой источник, если нужно)
+        # Используем RSS-ленту от PC Gamer
         url = "https://www.pcgamer.com/rss"
         response = requests.get(url)
-        soup = BeautifulSoup(response.content, 'lxml')
+        soup = BeautifulSoup(response.content, 'lxml', features="xml")
         items = soup.find_all("item")
         print(f"Prime: Найдено элементов в RSS: {len(items)}", flush=True)
         for item in items:
@@ -176,7 +176,7 @@ def check_battlefield(chat_id, user_chat_id=None):
 
         # Если новых скидок нет, отправляем сообщение в канал
         if new_discounts == 0:
-            message = "🔍 Новых скидок нет. Все актуальные скидки уже опубликованы! 💂‍♂️"
+            message = "🔍 Новых скидок нет. Все актуальные скидки уже опубликованы! ✅"
             bot.send_message(chat_id, message)
             print("Отправлено сообщение: новых скидок нет", flush=True)
 
@@ -232,6 +232,9 @@ def webhook():
                 print("Команда /check получена в канале, запускаю проверку...", flush=True)
                 chat_id = '@SalePixel'
                 threading.Thread(target=check_battlefield, args=(chat_id,), daemon=True).start()
+            elif update.channel_post.text == '/start':
+                print("Команда /start получена в канале, отправляю приветствие...", flush=True)
+                bot.send_message(update.channel_post.chat.id, "👋 Привет! Я бот, который ищет скидки и раздачи на Battlefield. Напиши /check, чтобы запустить проверку. Все скидки публикуются в @SalePixel: https://t.me/SalePixel 📢")
             else:
                 print("Получена другая команда в канале, игнорирую", flush=True)
 
