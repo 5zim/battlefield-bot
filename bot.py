@@ -107,33 +107,57 @@ def get_epic_battlefield():
     print(f"Найдено раздач в Epic: {len(discounts)}", flush=True)
     return discounts
 
-# Prime Gaming: Парсинг через RSS (новый источник)
-def get_prime_battlefield():
-    print("Проверяю Battlefield в Prime Gaming через RSS... 📢", flush=True)
+# GOG.com: Бесплатные раздачи и скидки
+def get_gog_battlefield():
+    print("Проверяю Battlefield в GOG.com... 🎁", flush=True)
     discounts = []
     try:
-        # Используем RSS-ленту от PC Gamer
-        url = "https://www.pcgamer.com/rss"
-        response = requests.get(url)
-        soup = BeautifulSoup(response.content, 'lxml', features="xml")
-        items = soup.find_all("item")
-        print(f"Prime: Найдено элементов в RSS: {len(items)}", flush=True)
-        for item in items:
-            title = item.find("title").text if item.find("title") else ""
-            if "Battlefield" in title and "Prime Gaming" in title:
-                print(f"Prime: Найдена игра: {title}", flush=True)
-                link = item.find("link").text if item.find("link") else "https://gaming.amazon.com/home"
+        # Проверяем бесплатные раздачи (Giveaways)
+        url = "https://www.gog.com/en/games?priceRange=0,0"
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+        }
+        response = requests.get(url, headers=headers)
+        soup = BeautifulSoup(response.content, "html.parser")
+        games = soup.find_all("a", class_="product-tile")
+        print(f"GOG: Найдено бесплатных игр: {len(games)}", flush=True)
+        for game in games:
+            title = game.find("span", class_="product-tile__title").text.strip()
+            if "Battlefield" in title:
+                game_url = "https://www.gog.com" + game.get("href")
                 discounts.append({
-                    "id": f"prime_{title}",
+                    "id": f"gog_giveaway_{title}",
                     "name": title,
                     "discount": 100,  # Бесплатно
-                    "price": "Free with Prime",
-                    "url": link,
-                    "store": "Prime Gaming"
+                    "price": "Free",
+                    "url": game_url,
+                    "store": "GOG.com"
                 })
+                print(f"GOG: Найдена бесплатная игра: {title}", flush=True)
+
+        # Проверяем скидки через API GOG
+        for title in BATTLEFIELD_TITLES:
+            search_url = f"https://catalog.gog.com/v1/catalog?query={title}&order=desc:discounted&limit=10"
+            response = requests.get(search_url, headers=headers).json()
+            products = response.get("products", [])
+            for product in products:
+                if "Battlefield" in product["title"]:
+                    discount = product.get("price", {}).get("discountPercentage", 0)
+                    if discount > 0:
+                        price = product["price"]["finalPrice"]
+                        product_url = f"https://www.gog.com{product['url']}"
+                        discounts.append({
+                            "id": f"gog_discount_{product['id']}",
+                            "name": product["title"],
+                            "discount": discount,
+                            "price": price,
+                            "url": product_url,
+                            "store": "GOG.com"
+                        })
+                        print(f"GOG: Найдена скидка: {product['title']} - {discount}%", flush=True)
     except Exception as e:
-        print(f"Ошибка проверки Prime: {e}", flush=True)
-    print(f"Найдено в Prime Gaming: {len(discounts)}", flush=True)
+        print(f"Ошибка проверки GOG: {e}", flush=True)
+    print(f"Найдено в GOG.com: {len(discounts)}", flush=True)
     return discounts
 
 # Очистка posted_items раз в неделю
@@ -149,7 +173,7 @@ def check_battlefield(chat_id, user_chat_id=None):
     all_discounts = (
         get_cheapshark_deals() +
         get_epic_battlefield() +
-        get_prime_battlefield()
+        get_gog_battlefield()
     )
     new_discounts = 0
     if not all_discounts:
@@ -263,7 +287,7 @@ def run_schedule():
 if __name__ == "__main__":
     print("Бот запущен! 🚀", flush=True)
     schedule.every().day.at("12:00").do(check_battlefield, chat_id='@SalePixel')  # Ежедневно в 12:00 UTC
-    schedule.every().monday.at("00:00").do(clear_posted_items)  # Очистка posted_items каждую неделю в понедельник в 00:00 UTC
+    schedule.every().monday.at("00:00").do(clear_posted_items)  # Очистка posted_items каждую неделю в Понедельник в 00:00 UTC
     threading.Thread(target=run_schedule, daemon=True).start()
     set_webhook()
     port = int(os.getenv('PORT', 8000))
