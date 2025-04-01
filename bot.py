@@ -107,42 +107,30 @@ def get_epic_battlefield():
     print(f"Найдено раздач в Epic: {len(discounts)}", flush=True)
     return discounts
 
-# Prime Gaming: Парсинг через Telegram-канал
+# Prime Gaming: Парсинг через RSS (новый источник)
 def get_prime_battlefield():
-    print("Проверяю Battlefield в Prime Gaming через Telegram-канал... 📢", flush=True)
+    print("Проверяю Battlefield в Prime Gaming через RSS... 📢", flush=True)
     discounts = []
     try:
-        # Используем Telegram-канал @PrimeGamingNews (замени на реальный канал, если нужно)
-        channel_username = "@PrimeGamingNews"
-        # Получаем последние сообщения из канала (ограничимся 10 последними)
-        messages = bot.get_chat_history(channel_username, limit=10)
-        print(f"Prime: Найдено сообщений в канале: {len(messages)}", flush=True)
-        for message in messages:
-            if message.text:  # Проверяем, что сообщение содержит текст
-                title = message.text
-                if "Battlefield" in title and "Prime Gaming" in title:
-                    print(f"Prime: Найдена игра: {title}", flush=True)
-                    # Ищем ссылку в сообщении
-                    link = "https://gaming.amazon.com/home"
-                    if message.entities:
-                        for entity in message.entities:
-                            if entity.type == "text_link":
-                                link = entity.url
-                                break
-                            elif entity.type == "url":
-                                # Извлекаем URL из текста
-                                start = entity.offset
-                                length = entity.length
-                                link = title[start:start + length]
-                                break
-                    discounts.append({
-                        "id": f"prime_{title}",
-                        "name": title,
-                        "discount": 100,  # Бесплатно
-                        "price": "Free with Prime",
-                        "url": link,
-                        "store": "Prime Gaming"
-                    })
+        # Используем RSS-ленту от PC Gamer (замени на другой источник, если нужно)
+        url = "https://www.pcgamer.com/rss"
+        response = requests.get(url)
+        soup = BeautifulSoup(response.content, 'lxml')
+        items = soup.find_all("item")
+        print(f"Prime: Найдено элементов в RSS: {len(items)}", flush=True)
+        for item in items:
+            title = item.find("title").text if item.find("title") else ""
+            if "Battlefield" in title and "Prime Gaming" in title:
+                print(f"Prime: Найдена игра: {title}", flush=True)
+                link = item.find("link").text if item.find("link") else "https://gaming.amazon.com/home"
+                discounts.append({
+                    "id": f"prime_{title}",
+                    "name": title,
+                    "discount": 100,  # Бесплатно
+                    "price": "Free with Prime",
+                    "url": link,
+                    "store": "Prime Gaming"
+                })
     except Exception as e:
         print(f"Ошибка проверки Prime: {e}", flush=True)
     print(f"Найдено в Prime Gaming: {len(discounts)}", flush=True)
@@ -165,23 +153,32 @@ def check_battlefield(chat_id, user_chat_id=None):
     )
     new_discounts = 0
     if not all_discounts:
-        bot.send_message(chat_id, "🔍 Пока Battlefield отдыхает от скидок и раздач. Солдаты, готовьте кошельки — ждём следующую атаку акций! 💂‍♂️")
+        message = "🔍 Пока Battlefield отдыхает от скидок и раздач. Солдаты, готовьте кошельки — ждём следующую атаку акций! 💂‍♂️"
+        bot.send_message(chat_id, message)
         print("Отправлено сообщение об отсутствии скидок", flush=True)
+        if user_chat_id:
+            bot.send_message(user_chat_id, f"✅ Проверка завершена! Новых скидок нет. Все актуальные скидки уже опубликованы в @SalePixel: https://t.me/SalePixel 📢")
     else:
         for item in all_discounts:
             item_id = item["id"]
             if item_id not in posted_items:
                 message = (
-                    f"🎮 **{item['name']}** 🎮\n"
-                    f"🔥 *Скидка*: {item['discount']}% 🔥\n"
-                    f"💰 *Цена*: {item['price']} 💸\n"
-                    f"🏪 *Магазин*: {item['store']} 🏬\n"
-                    f"🔗 [Купить]({item['url']}) 🛒"
+                    f"🎮 **{item['name']}**\n"
+                    f"🔥 Скидка: {item['discount']}%\n"
+                    f"💰 Цена: {item['price']}\n"
+                    f"🏪 Магазин: {item['store']}\n"
+                    f"🔗 [Купить]({item['url']})"
                 )
                 bot.send_message(chat_id, message, parse_mode="Markdown", disable_web_page_preview=True)
                 posted_items.add(item_id)
                 print(f"Опубликовано: {item['name']}", flush=True)
                 new_discounts += 1
+
+        # Если новых скидок нет, отправляем сообщение в канал
+        if new_discounts == 0:
+            message = "🔍 Новых скидок нет. Все актуальные скидки уже опубликованы! 💂‍♂️"
+            bot.send_message(chat_id, message)
+            print("Отправлено сообщение: новых скидок нет", flush=True)
 
     # Если запрос был из лички, отправляем пользователю уведомление
     if user_chat_id:
