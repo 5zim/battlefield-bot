@@ -238,6 +238,40 @@ def get_fanatical_battlefield():
     print(f"Найдено в Fanatical: {len(discounts)}", flush=True)
     return discounts
 
+# Steam: Бесплатные раздачи через RSS-ленту
+def get_steam_battlefield():
+    print("Проверяю Battlefield в Steam (раздачи)... 🎮", flush=True)
+    discounts = []
+    try:
+        url = "https://store.steampowered.com/feeds/news/"
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+        }
+        response = requests.get(url, headers=headers)
+        soup = BeautifulSoup(response.content, "xml")
+        items = soup.find_all("item")
+        print(f"Steam: Найдено новостей: {len(items)}", flush=True)
+        for item in items:
+            title = item.find("title").text.strip()
+            if "Battlefield" in title and "free" in title.lower():
+                link = item.find("link").text.strip()
+                # Проверяем, соответствует ли название одной из игр в BATTLEFIELD_TITLES
+                matches_title = any(bf_title in title for bf_title in BATTLEFIELD_TITLES)
+                if matches_title:
+                    discounts.append({
+                        "id": f"steam_{title}",
+                        "name": title,
+                        "discount": 100,  # Бесплатно
+                        "price": "Free",
+                        "url": link,
+                        "store": "Steam"
+                    })
+                    print(f"Steam: Найдена бесплатная раздача: {title}", flush=True)
+    except Exception as e:
+        print(f"Ошибка проверки Steam: {e}", flush=True)
+    print(f"Найдено в Steam: {len(discounts)}", flush=True)
+    return discounts
+
 # Очистка posted_items раз в неделю
 def clear_posted_items():
     print("Очищаю posted_items... 🧹", flush=True)
@@ -253,7 +287,8 @@ def check_battlefield(chat_id, user_chat_id=None):
         get_epic_battlefield() +
         get_gog_battlefield() +
         get_indiegala_battlefield() +
-        get_fanatical_battlefield()
+        get_fanatical_battlefield() +
+        get_steam_battlefield()  # Добавляем проверку Steam
     )
     new_discounts = 0
     if not all_discounts:
