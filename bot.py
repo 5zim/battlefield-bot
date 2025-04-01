@@ -184,17 +184,25 @@ def webhook():
 
         # Проверка для личных сообщений и групп
         if update.message:
-            print(f"Сообщение: {update.message.text}, Chat ID: {update.message.chat.id}, Message ID: {update.message.message_id}", flush=True)
+            print(f"Личное сообщение получено: {update.message}", flush=True)
+            print(f"Текст сообщения: {update.message.text}, Chat ID: {update.message.chat.id}, Message ID: {update.message.message_id}", flush=True)
             if update.message.text == '/check':
+                print("Команда /check получена в личке, запускаю проверку...", flush=True)
                 chat_id = '@SalePixel'
                 threading.Thread(target=check_battlefield, args=(chat_id,), daemon=True).start()
+            else:
+                print("Получена другая команда в личке, игнорирую", flush=True)
 
         # Проверка для каналов
         elif update.channel_post:
-            print(f"Сообщение из канала: {update.channel_post.text}, Chat ID: {update.channel_post.chat.id}", flush=True)
+            print(f"Сообщение из канала получено: {update.channel_post}", flush=True)
+            print(f"Текст сообщения: {update.channel_post.text}, Chat ID: {update.channel_post.chat.id}", flush=True)
             if update.channel_post.text == '/check':
+                print("Команда /check получена в канале, запускаю проверку...", flush=True)
                 chat_id = '@SalePixel'
                 threading.Thread(target=check_battlefield, args=(chat_id,), daemon=True).start()
+            else:
+                print("Получена другая команда в канале, игнорирую", flush=True)
 
         return 'OK', 200
     except Exception as e:
