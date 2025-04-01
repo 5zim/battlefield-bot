@@ -58,19 +58,20 @@ def check_rate_limit(chat_id, user_id):
     command_counts[chat_id] = [t for t in command_counts[chat_id] if current_time - t < 60]
     command_counts[chat_id].append(current_time)
 
-    if len(command_counts[chat_id]) >= 2:
+    # Проверяем количество команд
+    if len(command_counts[chat_id]) >= 3:
+        timeout_until = current_time + 3600
+        timeouts[chat_id] = timeout_until
+        message = "Нубище, я думаю тебе нужно перекурить часик. Ты отправил слишком много команд подряд. 🚬"
+        bot.send_message(chat_id, message)
+        print(f"Отправлено сообщение пользователю {chat_id}: {message}", flush=True)
+        print(f"Пользователь {user_id} получил тайм-аут на 1 час", flush=True)
+        return False
+    elif len(command_counts[chat_id]) == 2:
         message = "Братан, остынь, не надо спамить, я тебе уже ответил ранее.😎"
         bot.send_message(chat_id, message)
         print(f"Отправлено сообщение пользователю {chat_id}: {message}", flush=True)
         print(f"Пользователь {user_id} получил предупреждение за спам", flush=True)
-        if len(command_counts[chat_id]) >= 3:
-            timeout_until = current_time + 3600
-            timeouts[chat_id] = timeout_until
-            message = "Нубище, я думаю тебе нужно перекурить часик. Ты отправил слишком много команд подряд. 🚬"
-            bot.send_message(chat_id, message)
-            print(f"Отправлено сообщение пользователю {chat_id}: {message}", flush=True)
-            print(f"Пользователь {user_id} получил тайм-аут на 1 час", flush=True)
-            return False
 
     return True
 
