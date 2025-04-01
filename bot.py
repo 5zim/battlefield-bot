@@ -43,6 +43,7 @@ def get_cheapshark_deals():
         stores_response = requests.get(stores_url).json()
         store_map = {store["storeID"]: store["storeName"] for store in stores_response}
         print(f"CheapShark: Найдено магазинов: {len(store_map)}", flush=True)
+        print(f"Список магазинов: {list(store_map.values())}", flush=True)
 
         # Ищем скидки на Battlefield
         for title in BATTLEFIELD_TITLES:
@@ -114,7 +115,7 @@ def get_prime_battlefield():
         # Используем RSS-ленту (GamingOnLinux)
         url = "https://www.gamingonlinux.com/feeds/rss/"
         response = requests.get(url)
-        soup = BeautifulSoup(response.content, 'xml', features='lxml')
+        soup = BeautifulSoup(response.content, 'lxml')  # Исправлено: убрали features='lxml'
         items = soup.find_all("item")
         print(f"Prime: Найдено элементов в RSS: {len(items)}", flush=True)
         for item in items:
@@ -136,13 +137,14 @@ def get_prime_battlefield():
     return discounts
 
 # Проверка и публикация
-def check_battlefield(chat_id):
+def check_battlefield(chat_id, user_chat_id=None):
     print("Запускаю проверку Battlefield...", flush=True)
     all_discounts = (
         get_cheapshark_deals() +
         get_epic_battlefield() +
         get_prime_battlefield()
     )
+    new_discounts = 0
     if not all_discounts:
         bot.send_message(chat_id, "🔍 Пока Battlefield отдыхает от скидок и раздач. Солдаты, готовьте кошельки — ждём следующую атаку акций!")
         print("Отправлено сообщение об отсутствии скидок", flush=True)
@@ -160,6 +162,15 @@ def check_battlefield(chat_id):
                 bot.send_message(chat_id, message, parse_mode="Markdown", disable_web_page_preview=True)
                 posted_items.add(item_id)
                 print(f"Опубликовано: {item['name']}", flush=True)
+                new_discounts += 1
+
+    # Если запрос был из лички, отправляем пользователю уведомление
+    if user_chat_id:
+        if new_discounts > 0:
+            bot.send_message(user_chat_id, f"Проверка завершена! Найдено {new_discounts} новых скидок. Посмотри в @SalePixel: https://t.me/SalePixel")
+        else:
+            bot.send_message(user_chat_id, "Проверка завершена! Новых скидок нет. Все актуальные скидки уже опубликованы в @SalePixel: https://t.me/SalePixel")
+        print(f"Отправлено уведомление пользователю {user_chat_id}", flush=True)
 
 # Корневой маршрут для проверки Render
 @app.route('/', methods=['GET'])
@@ -189,7 +200,8 @@ def webhook():
             if update.message.text == '/check':
                 print("Команда /check получена в личке, запускаю проверку...", flush=True)
                 chat_id = '@SalePixel'
-                threading.Thread(target=check_battlefield, args=(chat_id,), daemon=True).start()
+                user_chat_id = update.message.chat.id
+                threading.Thread(target=check_battlefield, args=(chat_id, user_chat_id), daemon=True).start()
             else:
                 print("Получена другая команда в личке, игнорирую", flush=True)
 
