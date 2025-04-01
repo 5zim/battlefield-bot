@@ -34,7 +34,7 @@ posted_items = set()
 
 # CheapShark API: Скидки на игры
 def get_cheapshark_deals():
-    print("Проверяю скидки через CheapShark API...", flush=True)
+    print("Проверяю скидки через CheapShark API... 🕵️‍♂️", flush=True)
     discounts = []
     seen_deals = set()  # Для фильтрации дубликатов
     try:
@@ -75,7 +75,7 @@ def get_cheapshark_deals():
 
 # Epic Games: Только бесплатные раздачи
 def get_epic_battlefield():
-    print("Проверяю Battlefield в Epic Games...", flush=True)
+    print("Проверяю Battlefield в Epic Games... 🎮", flush=True)
     discounts = []
     try:
         url = "https://store-site-backend-static-ipv4.ak.epicgames.com/freeGamesPromotions?locale=en-US&country=US&allowCountries=US"
@@ -107,38 +107,57 @@ def get_epic_battlefield():
     print(f"Найдено раздач в Epic: {len(discounts)}", flush=True)
     return discounts
 
-# Prime Gaming: Парсинг через RSS
+# Prime Gaming: Парсинг через Telegram-канал
 def get_prime_battlefield():
-    print("Проверяю Battlefield в Prime Gaming через RSS...", flush=True)
+    print("Проверяю Battlefield в Prime Gaming через Telegram-канал... 📢", flush=True)
     discounts = []
     try:
-        # Используем RSS-ленту (GamingOnLinux)
-        url = "https://www.gamingonlinux.com/feeds/rss/"
-        response = requests.get(url)
-        soup = BeautifulSoup(response.content, 'lxml')  # Исправлено: убрали features='lxml'
-        items = soup.find_all("item")
-        print(f"Prime: Найдено элементов в RSS: {len(items)}", flush=True)
-        for item in items:
-            title = item.find("title").text if item.find("title") else ""
-            if "Battlefield" in title and "Prime Gaming" in title:
-                print(f"Prime: Найдена игра: {title}", flush=True)
-                link = item.find("link").text if item.find("link") else "https://gaming.amazon.com/home"
-                discounts.append({
-                    "id": f"prime_{title}",
-                    "name": title,
-                    "discount": 100,  # Бесплатно
-                    "price": "Free with Prime",
-                    "url": link,
-                    "store": "Prime Gaming"
-                })
+        # Используем Telegram-канал @PrimeGamingNews (замени на реальный канал, если нужно)
+        channel_username = "@PrimeGamingNews"
+        # Получаем последние сообщения из канала (ограничимся 10 последними)
+        messages = bot.get_chat_history(channel_username, limit=10)
+        print(f"Prime: Найдено сообщений в канале: {len(messages)}", flush=True)
+        for message in messages:
+            if message.text:  # Проверяем, что сообщение содержит текст
+                title = message.text
+                if "Battlefield" in title and "Prime Gaming" in title:
+                    print(f"Prime: Найдена игра: {title}", flush=True)
+                    # Ищем ссылку в сообщении
+                    link = "https://gaming.amazon.com/home"
+                    if message.entities:
+                        for entity in message.entities:
+                            if entity.type == "text_link":
+                                link = entity.url
+                                break
+                            elif entity.type == "url":
+                                # Извлекаем URL из текста
+                                start = entity.offset
+                                length = entity.length
+                                link = title[start:start + length]
+                                break
+                    discounts.append({
+                        "id": f"prime_{title}",
+                        "name": title,
+                        "discount": 100,  # Бесплатно
+                        "price": "Free with Prime",
+                        "url": link,
+                        "store": "Prime Gaming"
+                    })
     except Exception as e:
         print(f"Ошибка проверки Prime: {e}", flush=True)
     print(f"Найдено в Prime Gaming: {len(discounts)}", flush=True)
     return discounts
 
+# Очистка posted_items раз в неделю
+def clear_posted_items():
+    print("Очищаю posted_items... 🧹", flush=True)
+    global posted_items
+    posted_items.clear()
+    print("posted_items очищен!", flush=True)
+
 # Проверка и публикация
 def check_battlefield(chat_id, user_chat_id=None):
-    print("Запускаю проверку Battlefield...", flush=True)
+    print("Запускаю проверку Battlefield... ⚔️", flush=True)
     all_discounts = (
         get_cheapshark_deals() +
         get_epic_battlefield() +
@@ -146,18 +165,18 @@ def check_battlefield(chat_id, user_chat_id=None):
     )
     new_discounts = 0
     if not all_discounts:
-        bot.send_message(chat_id, "🔍 Пока Battlefield отдыхает от скидок и раздач. Солдаты, готовьте кошельки — ждём следующую атаку акций!")
+        bot.send_message(chat_id, "🔍 Пока Battlefield отдыхает от скидок и раздач. Солдаты, готовьте кошельки — ждём следующую атаку акций! 💂‍♂️")
         print("Отправлено сообщение об отсутствии скидок", flush=True)
     else:
         for item in all_discounts:
             item_id = item["id"]
             if item_id not in posted_items:
                 message = (
-                    f"🎮 {item['name']}\n"
-                    f"🔥 Скидка: {item['discount']}%\n"
-                    f"💰 Цена: {item['price']}\n"
-                    f"🏪 Магазин: {item['store']}\n"
-                    f"🔗 [Купить]({item['url']})"
+                    f"🎮 **{item['name']}** 🎮\n"
+                    f"🔥 *Скидка*: {item['discount']}% 🔥\n"
+                    f"💰 *Цена*: {item['price']} 💸\n"
+                    f"🏪 *Магазин*: {item['store']} 🏬\n"
+                    f"🔗 [Купить]({item['url']}) 🛒"
                 )
                 bot.send_message(chat_id, message, parse_mode="Markdown", disable_web_page_preview=True)
                 posted_items.add(item_id)
@@ -167,9 +186,9 @@ def check_battlefield(chat_id, user_chat_id=None):
     # Если запрос был из лички, отправляем пользователю уведомление
     if user_chat_id:
         if new_discounts > 0:
-            bot.send_message(user_chat_id, f"Проверка завершена! Найдено {new_discounts} новых скидок. Посмотри в @SalePixel: https://t.me/SalePixel")
+            bot.send_message(user_chat_id, f"✅ Проверка завершена! Найдено {new_discounts} новых скидок. Посмотри в @SalePixel: https://t.me/SalePixel 📢")
         else:
-            bot.send_message(user_chat_id, "Проверка завершена! Новых скидок нет. Все актуальные скидки уже опубликованы в @SalePixel: https://t.me/SalePixel")
+            bot.send_message(user_chat_id, "✅ Проверка завершена! Новых скидок нет. Все актуальные скидки уже опубликованы в @SalePixel: https://t.me/SalePixel 📢")
         print(f"Отправлено уведомление пользователю {user_chat_id}", flush=True)
 
 # Корневой маршрут для проверки Render
@@ -202,6 +221,9 @@ def webhook():
                 chat_id = '@SalePixel'
                 user_chat_id = update.message.chat.id
                 threading.Thread(target=check_battlefield, args=(chat_id, user_chat_id), daemon=True).start()
+            elif update.message.text == '/start':
+                print("Команда /start получена в личке, отправляю приветствие...", flush=True)
+                bot.send_message(update.message.chat.id, "👋 Привет! Я бот, который ищет скидки и раздачи на Battlefield. Напиши /check, чтобы запустить проверку. Все скидки публикуются в @SalePixel: https://t.me/SalePixel 📢")
             else:
                 print("Получена другая команда в личке, игнорирую", flush=True)
 
@@ -239,8 +261,9 @@ def run_schedule():
 
 # Запуск
 if __name__ == "__main__":
-    print("Бот запущен!", flush=True)
+    print("Бот запущен! 🚀", flush=True)
     schedule.every().day.at("12:00").do(check_battlefield, chat_id='@SalePixel')  # Ежедневно в 12:00 UTC
+    schedule.every().monday.at("00:00").do(clear_posted_items)  # Очистка posted_items каждую неделю в понедельник в 00:00 UTC
     threading.Thread(target=run_schedule, daemon=True).start()
     set_webhook()
     port = int(os.getenv('PORT', 8000))
