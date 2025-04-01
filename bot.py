@@ -387,6 +387,25 @@ def webhook():
             print("Ошибка: Не удалось распарсить Update", flush=True)
             return 'Bad Request', 400
 
+        # Обработка новых участников группы
+        if update.message and update.message.new_chat_members:
+            chat_id = update.message.chat.id
+            for new_member in update.message.new_chat_members:
+                # Пропускаем, если новый участник — это сам бот
+                if new_member.id == bot.get_me().id:
+                    continue
+                first_name = new_member.first_name if new_member.first_name else "друг"
+                user_id = new_member.id
+                welcome_message = (
+                    f"👋 Привет, {first_name}! Добро пожаловать в нашу группу! 🎉\n"
+                    "Я бот, который ищет скидки и раздачи на Battlefield. "
+                    "Напиши /check, чтобы запустить проверку. "
+                    "Все скидки публикуются в @SalePixel: https://t.me/SalePixel 📢"
+                )
+                bot.send_message(chat_id, welcome_message)
+                print(f"Отправлено приветствие новому участнику {first_name} (ID: {user_id}) в чате {chat_id}", flush=True)
+
+        # Обработка личных сообщений
         if update.message:
             print(f"Личное сообщение получено: {update.message}", flush=True)
             chat_id = update.message.chat.id
@@ -409,6 +428,7 @@ def webhook():
             else:
                 print("Получена другая команда в личке, игнорирую", flush=True)
 
+        # Обработка сообщений из канала
         elif update.channel_post:
             print(f"Сообщение из канала получено: {update.channel_post}", flush=True)
             chat_id = update.channel_post.chat.id
