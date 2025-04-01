@@ -32,6 +32,10 @@ app = Flask(__name__)
 # Хранилище для отслеживания скидок
 posted_items = set()
 
+# Хранилище для истории команд и тайм-аутов
+user_command_history = {}  # {user_id: [{"command": "/check", "timestamp": 1743519744}, ...]}
+user_timeouts = {}  # {user_id: timeout_expiry_timestamp}
+
 # CheapShark API: Скидки на игры
 def get_cheapshark_deals():
     print("Проверяю скидки через CheapShark API... 🕵️‍♂️", flush=True)
@@ -279,6 +283,74 @@ def clear_posted_items():
     posted_items.clear()
     print("posted_items очищен!", flush=True)
 
+# Очистка старых записей в user_command_history раз в день
+def clear_old_command_history():
+    print("Очищаю старые записи в user_command_history... 🧹", flush=True)
+    current_time = int(time.time())
+    for user_id in list(user_command_history.keys()):
+        # Оставляем только записи за последние 24 часа
+        user_command_history[user_id] = [
+            entry for entry in user_command_history[user_id]
+            if current_time - entry["timestamp"] <= 24 * 60 * 60
+        ]
+        # Если записей не осталось, удаляем пользователя
+        if not user_command_history[user_id]:
+            del user_command_history[user_id]
+    print("Очистка user_command_history завершена!", flush=True)
+
+# Проверка ограничения частоты команд
+def check_rate_limit(user_id, command, chat_id):
+    current_time = int(time.time())
+    
+    # Пропускаем проверку для канала @SalePixel
+    if str(chat_id).startswith('-100'):  # Каналы имеют отрицательные ID
+        return True, None
+
+    # Проверяем, есть ли тайм-аут
+    if user_id in user_timeouts:
+        if current_time < user_timeouts[user_id]:
+            remaining_time = user_timeouts[user_id] - current_time
+            minutes_left = remaining_time // 60
+            seconds_left = remaining_time % 60
+            message = f"Нубище, ты на тайм-ауте! Подожди ещё {minutes_left} минут {seconds_left} секунд, прежде чем снова писать. 🚬"
+            return False, message
+        else:
+            # Тайм-аут истёк, удаляем его
+            del user_timeouts[user_id]
+            print(f"Тайм-аут для пользователя {user_id} истёк, удалён из user_timeouts", flush=True)
+
+    # Инициализируем историю команд для пользователя, если её нет
+    if user_id not in user_command_history:
+        user_command_history[user_id] = []
+
+    # Добавляем текущую команду в историю
+    user_command_history[user_id].append({"command": command, "timestamp": current_time})
+
+    # Фильтруем команды за последние 60 секунд
+    recent_commands = [
+        entry for entry in user_command_history[user_id]
+        if current_time - entry["timestamp"] <= 60
+    ]
+    user_command_history[user_id] = recent_commands  # Обновляем историю, оставляя только последние 60 секунд
+
+    # Считаем, сколько раз была отправлена текущая команда
+    command_count = sum(1 for entry in recent_commands if entry["command"] == command)
+
+    if command_count >= 3:
+        # Выдаём тайм-аут на 1 час
+        timeout_duration = 60 * 60  # 1 час в секундах
+        user_timeouts[user_id] = current_time + timeout_duration
+        message = "Нубище, я думаю тебе нужно перекурить часик. Ты отправил слишком много команд подряд. 🚬"
+        print(f"Пользователь {user_id} получил тайм-аут на 1 час", flush=True)
+        return False, message
+    elif command_count == 2:
+        # Предупреждение после 2-й команды
+        message = "Братан, остынь, не надо спамить, я тебе уже ответил ранее.😎"
+        print(f"Пользователь {user_id} получил предупреждение за спам", flush=True)
+        return True, message
+
+    return True, None
+
 # Проверка и публикация
 def check_battlefield(chat_id, user_chat_id=None):
     print("Запускаю проверку Battlefield... ⚔️", flush=True)
@@ -288,7 +360,7 @@ def check_battlefield(chat_id, user_chat_id=None):
         get_gog_battlefield() +
         get_indiegala_battlefield() +
         get_fanatical_battlefield() +
-        get_steam_battlefield()  # Добавляем проверку Steam
+        get_steam_battlefield()
     )
     new_discounts = 0
     if not all_discounts:
@@ -350,14 +422,34 @@ def webhook():
 
         # Проверка для личных сообщений и групп
         if update.message:
+            user_id = update.message.from_user.id
+            chat_id = update.message.chat.id
             print(f"Личное сообщение получено: {update.message}", flush=True)
-            print(f"Текст сообщения: {update.message.text}, Chat ID: {update.message.chat.id}, Message ID: {update.message.message_id}", flush=True)
+            print(f"Текст сообщения: {update.message.text}, Chat ID: {chat_id}, Message ID: {update.message.message_id}", flush=True)
+
             if update.message.text == '/check':
+                # Проверяем ограничение частоты
+                allowed, rate_limit_message = check_rate_limit(user_id, "/check", chat_id)
+                if not allowed:
+                    bot.send_message(chat_id, rate_limit_message)
+                    return 'OK', 200
+                if rate_limit_message:
+                    bot.send_message(chat_id, rate_limit_message)
+
                 print("Команда /check получена в личке, запускаю проверку...", flush=True)
                 chat_id = '@SalePixel'
                 user_chat_id = update.message.chat.id
                 threading.Thread(target=check_battlefield, args=(chat_id, user_chat_id), daemon=True).start()
+
             elif update.message.text == '/start':
+                # Проверяем ограничение частоты
+                allowed, rate_limit_message = check_rate_limit(user_id, "/start", chat_id)
+                if not allowed:
+                    bot.send_message(chat_id, rate_limit_message)
+                    return 'OK', 200
+                if rate_limit_message:
+                    bot.send_message(chat_id, rate_limit_message)
+
                 print("Команда /start получена в личке, отправляю приветствие...", flush=True)
                 bot.send_message(update.message.chat.id, "👋 Привет! Я бот, который ищет скидки и раздачи на Battlefield. Напиши /check, чтобы запустить проверку. Все скидки публикуются в @SalePixel: https://t.me/SalePixel 📢")
             else:
@@ -365,13 +457,32 @@ def webhook():
 
         # Проверка для каналов
         elif update.channel_post:
+            chat_id = update.channel_post.chat.id
             print(f"Сообщение из канала получено: {update.channel_post}", flush=True)
-            print(f"Текст сообщения: {update.channel_post.text}, Chat ID: {update.channel_post.chat.id}", flush=True)
+            print(f"Текст сообщения: {update.channel_post.text}, Chat ID: {chat_id}", flush=True)
+
             if update.channel_post.text == '/check':
+                # Проверяем ограничение частоты (хотя для канала оно будет проигнорировано)
+                allowed, rate_limit_message = check_rate_limit(chat_id, "/check", chat_id)
+                if not allowed:
+                    bot.send_message(chat_id, rate_limit_message)
+                    return 'OK', 200
+                if rate_limit_message:
+                    bot.send_message(chat_id, rate_limit_message)
+
                 print("Команда /check получена в канале, запускаю проверку...", flush=True)
                 chat_id = '@SalePixel'
                 threading.Thread(target=check_battlefield, args=(chat_id,), daemon=True).start()
+
             elif update.channel_post.text == '/start':
+                # Проверяем ограничение частоты (хотя для канала оно будет проигнорировано)
+                allowed, rate_limit_message = check_rate_limit(chat_id, "/start", chat_id)
+                if not allowed:
+                    bot.send_message(chat_id, rate_limit_message)
+                    return 'OK', 200
+                if rate_limit_message:
+                    bot.send_message(chat_id, rate_limit_message)
+
                 print("Команда /start получена в канале, отправляю приветствие...", flush=True)
                 bot.send_message(update.channel_post.chat.id, "👋 Привет! Я бот, который ищет скидки и раздачи на Battlefield. Напиши /check, чтобы запустить проверку. Все скидки публикуются в @SalePixel: https://t.me/SalePixel 📢")
             else:
@@ -403,7 +514,8 @@ if __name__ == "__main__":
     print("Бот запущен! 🚀", flush=True)
     schedule.every().day.at("12:00").do(check_battlefield, chat_id='@SalePixel')  # Ежедневно в 12:00 UTC
     schedule.every().monday.at("00:00").do(clear_posted_items)  # Очистка posted_items каждую неделю в Понедельник в 00:00 UTC
+    schedule.every().day.at("00:00").do(clear_old_command_history)  # Очистка user_command_history раз в день
     threading.Thread(target=run_schedule, daemon=True).start()
     set_webhook()
-    port = int(os.getenv('PORT', 8000))
+    port = int( os.getenv('PORT', 8000))
     app.run(host='0.0.0.0', port=port)
