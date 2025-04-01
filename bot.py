@@ -50,24 +50,29 @@ def get_cheapshark_deals():
             deals_url = f"https://www.cheapshark.com/api/1.0/deals?title={title}&sortBy=Price"
             response = requests.get(deals_url).json()
             for deal in response:
-                if "Battlefield" in deal["title"]:
-                    store_id = deal["storeID"]
-                    store_name = store_map.get(store_id, "Unknown Store")
-                    discount_percent = round(float(deal["savings"]))
-                    if discount_percent > 0:  # Только если есть скидка
-                        deal_key = f"{deal['title']}_{store_name}_{discount_percent}"  # Уникальный ключ для фильтрации
-                        if deal_key not in seen_deals:
-                            seen_deals.add(deal_key)
-                            deal_id = deal["dealID"]
-                            discounts.append({
-                                "id": f"cheapshark_{deal_id}",
-                                "name": deal["title"],
-                                "discount": discount_percent,
-                                "price": f"${deal['salePrice']}",
-                                "url": f"https://www.cheapshark.com/redirect?dealID={deal_id}",
-                                "store": store_name
-                            })
-                            print(f"CheapShark: Найдена скидка: {deal['title']} - {discount_percent}% в {store_name}", flush=True)
+                deal_title = deal["title"]
+                # Проверяем, что это игра из серии Battlefield от DICE
+                if "Battlefield" in deal_title and "Medieval" not in deal_title:
+                    # Проверяем, соответствует ли название одной из игр в BATTLEFIELD_TITLES
+                    matches_title = any(bf_title in deal_title for bf_title in BATTLEFIELD_TITLES)
+                    if matches_title:
+                        store_id = deal["storeID"]
+                        store_name = store_map.get(store_id, "Unknown Store")
+                        discount_percent = round(float(deal["savings"]))
+                        if discount_percent > 0:  # Только если есть скидка
+                            deal_key = f"{deal['title']}_{store_name}_{discount_percent}"  # Уникальный ключ для фильтрации
+                            if deal_key not in seen_deals:
+                                seen_deals.add(deal_key)
+                                deal_id = deal["dealID"]
+                                discounts.append({
+                                    "id": f"cheapshark_{deal_id}",
+                                    "name": deal["title"],
+                                    "discount": discount_percent,
+                                    "price": f"${deal['salePrice']}",
+                                    "url": f"https://www.cheapshark.com/redirect?dealID={deal_id}",
+                                    "store": store_name
+                                })
+                                print(f"CheapShark: Найдена скидка: {deal['title']} - {discount_percent}% в {store_name}", flush=True)
     except Exception as e:
         print(f"Ошибка проверки CheapShark: {e}", flush=True)
     print(f"Найдено скидок через CheapShark: {len(discounts)}", flush=True)
@@ -122,7 +127,10 @@ def get_gog_battlefield():
         games = soup.find_all("a", class_="product-tile")
         print(f"GOG: Найдено бесплатных игр: {len(games)}", flush=True)
         for game in games:
-            title = game.find("span", class_="product-tile__title").text.strip()
+            title_element = game.find("span", class_="product-tile__title")
+            if not title_element:
+                continue
+            title = title_element.text.strip()
             if "Battlefield" in title:
                 game_url = "https://www.gog.com" + game.get("href")
                 discounts.append({
@@ -160,6 +168,76 @@ def get_gog_battlefield():
     print(f"Найдено в GOG.com: {len(discounts)}", flush=True)
     return discounts
 
+# IndieGala: Бесплатные раздачи
+def get_indiegala_battlefield():
+    print("Проверяю Battlefield в IndieGala... 🎉", flush=True)
+    discounts = []
+    try:
+        url = "https://freebies.indiegala.com/"
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+        }
+        response = requests.get(url, headers=headers)
+        soup = BeautifulSoup(response.content, "html.parser")
+        games = soup.find_all("div", class_="relative")
+        print(f"IndieGala: Найдено бесплатных игр: {len(games)}", flush=True)
+        for game in games:
+            title_element = game.find("h5", class_="font-bold")
+            if not title_element:
+                continue
+            title = title_element.text.strip()
+            if "Battlefield" in title:
+                game_url = game.find("a", class_="relative")["href"]
+                discounts.append({
+                    "id": f"indiegala_{title}",
+                    "name": title,
+                    "discount": 100,  # Бесплатно
+                    "price": "Free",
+                    "url": game_url,
+                    "store": "IndieGala"
+                })
+                print(f"IndieGala: Найдена бесплатная игра: {title}", flush=True)
+    except Exception as e:
+        print(f"Ошибка проверки IndieGala: {e}", flush=True)
+    print(f"Найдено в IndieGala: {len(discounts)}", flush=True)
+    return discounts
+
+# Fanatical: Бесплатные раздачи
+def get_fanatical_battlefield():
+    print("Проверяю Battlefield в Fanatical... 🎈", flush=True)
+    discounts = []
+    try:
+        url = "https://www.fanatical.com/en/blog/free-games"
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+        }
+        response = requests.get(url, headers=headers)
+        soup = BeautifulSoup(response.content, "html.parser")
+        articles = soup.find_all("article")
+        print(f"Fanatical: Найдено статей: {len(articles)}", flush=True)
+        for article in articles:
+            title_element = article.find("h2")
+            if not title_element:
+                continue
+            title = title_element.text.strip()
+            if "Battlefield" in title:
+                link_element = article.find("a")
+                if link_element and "href" in link_element.attrs:
+                    game_url = "https://www.fanatical.com" + link_element["href"]
+                    discounts.append({
+                        "id": f"fanatical_{title}",
+                        "name": title,
+                        "discount": 100,  # Бесплатно
+                        "price": "Free",
+                        "url": game_url,
+                        "store": "Fanatical"
+                    })
+                    print(f"Fanatical: Найдена бесплатная игра: {title}", flush=True)
+    except Exception as e:
+        print(f"Ошибка проверки Fanatical: {e}", flush=True)
+    print(f"Найдено в Fanatical: {len(discounts)}", flush=True)
+    return discounts
+
 # Очистка posted_items раз в неделю
 def clear_posted_items():
     print("Очищаю posted_items... 🧹", flush=True)
@@ -173,7 +251,9 @@ def check_battlefield(chat_id, user_chat_id=None):
     all_discounts = (
         get_cheapshark_deals() +
         get_epic_battlefield() +
-        get_gog_battlefield()
+        get_gog_battlefield() +
+        get_indiegala_battlefield() +
+        get_fanatical_battlefield()
     )
     new_discounts = 0
     if not all_discounts:
