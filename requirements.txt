@@ -4,3 +4,5 @@ schedule
 beautifulsoup4
 flask
 lxml
+apscheduler
+pytz
