@@ -421,7 +421,7 @@ def webhook():
                 print("Команда /check получена в личке, запускаю проверку...", flush=True)
                 chat_id = '@SalePixel'
                 user_chat_id = update.message.chat.id
-                threading.Thread(target=check_battlefield, args=(chat_id, user_chat_id), daemon=True).start()
+                check_battlefield(chat_id, user_chat_id)
             elif update.message.text == '/start':
                 if not check_rate_limit(chat_id, user_id):
                     return 'OK', 200
@@ -440,7 +440,7 @@ def webhook():
             if update.channel_post.text == '/check':
                 print("Команда /check получена в канале, запускаю проверку...", flush=True)
                 chat_id = '@SalePixel'
-                threading.Thread(target=check_battlefield, args=(chat_id,), daemon=True).start()
+                check_battlefield(chat_id)
             elif update.channel_post.text == '/start':
                 print("Команда /start получена в канале, отправляю приветствие...", flush=True)
                 message = "👋 Привет! Я бот, который ищет скидки и раздачи на Battlefield. Напиши /check, чтобы запустить проверку. Все скидки публикуются в @SalePixel: https://t.me/SalePixel 📢"
