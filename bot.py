@@ -4,10 +4,10 @@ import telebot
 import re
 from bs4 import BeautifulSoup
 from flask import Flask, request
-import threading
-import schedule
 import time
 import os
+from apscheduler.schedulers.background import BackgroundScheduler
+import pytz
 
 # Токен бота
 TOKEN = os.getenv('TELEGRAM_TOKEN')
@@ -317,55 +317,58 @@ def clear_posted_items():
 
 # Проверка и публикация
 def check_battlefield(chat_id, user_chat_id=None):
-    print("Запускаю проверку Battlefield... ⚔️", flush=True)
-    all_discounts = (
-        get_cheapshark_deals() +
-        get_epic_battlefield() +
-        get_gog_battlefield() +
-        get_indiegala_battlefield() +
-        get_fanatical_battlefield() +
-        get_steam_battlefield()
-    )
-    new_discounts = 0
-    if not all_discounts:
-        message = "🔍 Пока Battlefield отдыхает от скидок и раздач. Солдаты, готовьте кошельки — ждём следующую атаку акций! 💂‍♂️"
-        bot.send_message(chat_id, message)
-        print(f"Отправлено сообщение в канал {chat_id}: {message}", flush=True)
-        if user_chat_id:
-            message = "✅ Проверка завершена! Новых скидок нет. Все актуальные скидки уже опубликованы в @SalePixel: https://t.me/SalePixel 📢"
-            bot.send_message(user_chat_id, message)
-            print(f"Отправлено сообщение пользователю {user_chat_id}: {message}", flush=True)
-    else:
-        for item in all_discounts:
-            item_id = item["id"]
-            if item_id not in posted_items:
-                message = (
-                    f"🎮 **{item['name']}**\n"
-                    f"🔥 Скидка: {item['discount']}%\n"
-                    f"💰 Цена: {item['price']}\n"
-                    f"🏪 Магазин: {item['store']}\n"
-                    f"🔗 [Купить]({item['url']})"
-                )
-                bot.send_message(chat_id, message, parse_mode="Markdown", disable_web_page_preview=True)
-                print(f"Отправлено сообщение в канал {chat_id}: {message}", flush=True)
-                print(f"Опубликовано: {item['name']}", flush=True)
-                posted_items.add(item_id)
-                new_discounts += 1
-
-        if new_discounts == 0:
-            message = "🔍 Новых скидок нет. Все актуальные скидки уже опубликованы! ✅"
+    try:
+        print("Запускаю проверку Battlefield... ⚔️", flush=True)
+        all_discounts = (
+            get_cheapshark_deals() +
+            get_epic_battlefield() +
+            get_gog_battlefield() +
+            get_indiegala_battlefield() +
+            get_fanatical_battlefield() +
+            get_steam_battlefield()
+        )
+        new_discounts = 0
+        if not all_discounts:
+            message = "🔍 Пока Battlefield отдыхает от скидок и раздач. Солдаты, готовьте кошельки — ждём следующую атаку акций! 💂‍♂️"
             bot.send_message(chat_id, message)
             print(f"Отправлено сообщение в канал {chat_id}: {message}", flush=True)
-            print("Отправлено сообщение: новых скидок нет", flush=True)
-
-    if user_chat_id:
-        if new_discounts > 0:
-            message = f"✅ Проверка завершена! Найдено {new_discounts} новых скидок. Посмотри в @SalePixel: https://t.me/SalePixel 📢"
+            if user_chat_id:
+                message = "✅ Проверка завершена! Новых скидок нет. Все актуальные скидки уже опубликованы в @SalePixel: https://t.me/SalePixel 📢"
+                bot.send_message(user_chat_id, message)
+                print(f"Отправлено сообщение пользователю {user_chat_id}: {message}", flush=True)
         else:
-            message = "✅ Проверка завершена! Новых скидок нет. Все актуальные скидки уже опубликованы в @SalePixel: https://t.me/SalePixel 📢"
-        bot.send_message(user_chat_id, message)
-        print(f"Отправлено сообщение пользователю {user_chat_id}: {message}", flush=True)
-        print(f"Отправлено уведомление пользователю {user_chat_id}", flush=True)
+            for item in all_discounts:
+                item_id = item["id"]
+                if item_id not in posted_items:
+                    message = (
+                        f"🎮 **{item['name']}**\n"
+                        f"🔥 Скидка: {item['discount']}%\n"
+                        f"💰 Цена: {item['price']}\n"
+                        f"🏪 Магазин: {item['store']}\n"
+                        f"🔗 [Купить]({item['url']})"
+                    )
+                    bot.send_message(chat_id, message, parse_mode="Markdown", disable_web_page_preview=True)
+                    print(f"Отправлено сообщение в канал {chat_id}: {message}", flush=True)
+                    print(f"Опубликовано: {item['name']}", flush=True)
+                    posted_items.add(item_id)
+                    new_discounts += 1
+
+            if new_discounts == 0:
+                message = "🔍 Новых скидок нет. Все актуальные скидки уже опубликованы! ✅"
+                bot.send_message(chat_id, message)
+                print(f"Отправлено сообщение в канал {chat_id}: {message}", flush=True)
+                print("Отправлено сообщение: новых скидок нет", flush=True)
+
+        if user_chat_id:
+            if new_discounts > 0:
+                message = f"✅ Проверка завершена! Найдено {new_discounts} новых скидок. Посмотри в @SalePixel: https://t.me/SalePixel 📢"
+            else:
+                message = "✅ Проверка завершена! Новых скидок нет. Все актуальные скидки уже опубликованы в @SalePixel: https://t.me/SalePixel 📢"
+            bot.send_message(user_chat_id, message)
+            print(f"Отправлено сообщение пользователю {user_chat_id}: {message}", flush=True)
+            print(f"Отправлено уведомление пользователю {user_chat_id}", flush=True)
+    except Exception as e:
+        print(f"Ошибка в check_battlefield: {e}", flush=True)
 
 # Корневой маршрут для проверки Render
 @app.route('/', methods=['GET'])
@@ -461,18 +464,17 @@ def set_webhook():
     except Exception as e:
         print(f"Ошибка установки webhook: {e}", flush=True)
 
-# Функция для расписания
-def run_schedule():
-    while True:
-        schedule.run_pending()
-        time.sleep(60)
-
 # Запуск
 if __name__ == "__main__":
     print("Бот запущен! 🚀", flush=True)
-    schedule.every().day.at("12:00").do(check_battlefield, chat_id='@SalePixel')
-    schedule.every().monday.at("00:00").do(clear_posted_items)
-    threading.Thread(target=run_schedule, daemon=True).start()
+    
+    # Настройка планировщика с часовым поясом МСК
+    scheduler = BackgroundScheduler(timezone=pytz.timezone('Europe/Moscow'))
+    scheduler.add_job(check_battlefield, 'cron', hour=15, minute=0, args=[CHAT_ID])
+    scheduler.add_job(clear_posted_items, 'cron', day_of_week='mon', hour=0, minute=0)
+    scheduler.start()
+    print("Планировщик запущен с часовым поясом МСК", flush=True)
+
     set_webhook()
     port = int(os.getenv('PORT', 8000))
     app.run(host='0.0.0.0', port=port)
