@@ -329,7 +329,7 @@ def check_battlefield(chat_id, user_chat_id=None):
         )
         new_discounts = 0
         if not all_discounts:
-            message = "🔍 Пока Battlefield отдыхает от скидок и раздач. Солдаты, готовьте кошельки — ждём следующую атаку акций! 💂‍♂️"
+            message = "🔍 Пока Battlefield отдыхает от скидок и раздач."
             bot.send_message(chat_id, message)
             print(f"Отправлено сообщение в канал {chat_id}: {message}", flush=True)
             if user_chat_id:
