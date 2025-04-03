@@ -468,12 +468,13 @@ def set_webhook():
 if __name__ == "__main__":
     print("Бот запущен! 🚀", flush=True)
     
-    # Настройка планировщика с часовым поясом МСК
-    scheduler = BackgroundScheduler(timezone=pytz.timezone('Europe/Moscow'))
-    scheduler.add_job(check_battlefield, 'cron', hour=15, minute=0, args=[CHAT_ID])
+    # Настройка планировщика с часовым поясом UTC
+    scheduler = BackgroundScheduler(timezone=pytz.UTC)
+    # Проверка в 12:00 UTC = 15:00 МСК
+    scheduler.add_job(check_battlefield, 'cron', hour=12, minute=0, args=[CHAT_ID])
     scheduler.add_job(clear_posted_items, 'cron', day_of_week='mon', hour=0, minute=0)
     scheduler.start()
-    print("Планировщик запущен с часовым поясом МСК", flush=True)
+    print("Планировщик запущен с часовым поясом UTC", flush=True)
 
     set_webhook()
     port = int(os.getenv('PORT', 8000))
