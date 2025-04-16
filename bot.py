@@ -8,9 +8,17 @@ import time
 import os
 from apscheduler.schedulers.background import BackgroundScheduler
 import pytz
+import logging
+
+# Настройка логирования
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
 # Токен бота
 TOKEN = os.getenv('TELEGRAM_TOKEN')
+if not TOKEN:
+    logger.error("TELEGRAM_TOKEN не задан")
+    exit(1)
 bot = telebot.TeleBot(TOKEN)
 
 # Чат для публикации
@@ -38,58 +46,53 @@ timeouts = {}
 
 # Проверка ограничения частоты команд
 def check_rate_limit(chat_id, user_id):
-    if str(chat_id).startswith("-100"):
+    if str(chat_id).startswith("-100"):  # Пропускаем каналы
         return True
 
     current_time = time.time()
 
-    # Сначала проверяем, есть ли уже тайм-аут
     if chat_id in timeouts and timeouts[chat_id] > current_time:
         remaining_time = int(timeouts[chat_id] - current_time)
         minutes, seconds = divmod(remaining_time, 60)
-        message = f"Нубище, ты на тайм-ауте! Подожди ещё {minutes} минут {seconds} секунд, прежде чем снова писать. 🚬"
+        message = f"Нубище, ты на тайм-ауте! Подожди ещё {minutes} минут {seconds} секунд. 🚬"
         bot.send_message(chat_id, message)
-        print(f"Отправлено сообщение пользователю {chat_id}: {message}", flush=True)
+        logger.info(f"Пользователь {user_id} на тайм-ауте: {message}")
         return False
 
-    # Если тайм-аута нет, проверяем частоту команд
     if chat_id not in command_counts:
         command_counts[chat_id] = []
     command_counts[chat_id] = [t for t in command_counts[chat_id] if current_time - t < 60]
     command_counts[chat_id].append(current_time)
 
-    # Проверяем количество команд
-    if len(command_counts[chat_id]) >= 3:
+    # Увеличиваем лимит до 5 команд в минуту для тестов
+    if len(command_counts[chat_id]) >= 5:
         timeout_until = current_time + 3600
         timeouts[chat_id] = timeout_until
-        message = "Нубище, я думаю тебе нужно перекурить часик. Ты отправил слишком много команд подряд. 🚬"
+        message = "Нубище, перекури часик, слишком много команд! 🚬"
         bot.send_message(chat_id, message)
-        print(f"Отправлено сообщение пользователю {chat_id}: {message}", flush=True)
-        print(f"Пользователь {user_id} получил тайм-аут на 1 час", flush=True)
+        logger.info(f"Пользователь {user_id} получил тайм-аут на 1 час")
         return False
-    elif len(command_counts[chat_id]) == 2:
-        message = "Братан, остынь, не надо спамить, я тебе уже ответил ранее.😎"
+    elif len(command_counts[chat_id]) == 4:
+        message = "Братан, не спами, я уже работаю! 😎"
         bot.send_message(chat_id, message)
-        print(f"Отправлено сообщение пользователю {chat_id}: {message}", flush=True)
-        print(f"Пользователь {user_id} получил предупреждение за спам", flush=True)
-
+        logger.info(f"Пользователь {user_id} получил предупреждение за спам")
     return True
 
 # CheapShark API: Скидки на игры
 def get_cheapshark_deals():
-    print("Проверяю скидки через CheapShark API... 🕵️‍♂️", flush=True)
+    logger.info("Проверяю скидки через CheapShark API...")
     discounts = []
     seen_deals = set()
     try:
         stores_url = "https://www.cheapshark.com/api/1.0/stores"
         stores_response = requests.get(stores_url).json()
         store_map = {store["storeID"]: store["storeName"] for store in stores_response}
-        print(f"CheapShark: Найдено магазинов: {len(store_map)}", flush=True)
-        print(f"Список магазинов: {list(store_map.values())}", flush=True)
+        logger.info(f"CheapShark: Найдено магазинов: {len(store_map)}")
 
         for title in BATTLEFIELD_TITLES:
             deals_url = f"https://www.cheapshark.com/api/1.0/deals?title={title}&sortBy=Price"
             response = requests.get(deals_url).json()
+            time.sleep(1)  # Задержка для избежания лимитов
             for deal in response:
                 deal_title = deal["title"]
                 if "Battlefield" in deal_title and "Medieval" not in deal_title:
@@ -111,15 +114,15 @@ def get_cheapshark_deals():
                                     "url": f"https://www.cheapshark.com/redirect?dealID={deal_id}",
                                     "store": store_name
                                 })
-                                print(f"CheapShark: Найдена скидка: {deal['title']} - {discount_percent}% в {store_name}", flush=True)
+                                logger.info(f"CheapShark: Найдена скидка: {deal['title']} - {discount_percent}% в {store_name}")
     except Exception as e:
-        print(f"Ошибка проверки CheapShark: {e}", flush=True)
-    print(f"Найдено скидок через CheapShark: {len(discounts)}", flush=True)
+        logger.error(f"Ошибка проверки CheapShark: {e}")
+    logger.info(f"Найдено скидок через CheapShark: {len(discounts)}")
     return discounts
 
 # Epic Games: Только бесплатные раздачи
 def get_epic_battlefield():
-    print("Проверяю Battlefield в Epic Games... 🎮", flush=True)
+    logger.info("Проверяю Battlefield в Epic Games...")
     discounts = []
     try:
         url = "https://store-site-backend-static-ipv4.ak.epicgames.com/freeGamesPromotions?locale=en-US&country=US&allowCountries=US"
@@ -127,14 +130,14 @@ def get_epic_battlefield():
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
         }
         response = requests.get(url, headers=headers)
-        print(f"Epic: Статус ответа: {response.status_code}", flush=True)
+        logger.info(f"Epic: Статус ответа: {response.status_code}")
         data = response.json()
         games = data["data"]["Catalog"]["searchStore"]["elements"]
-        print(f"Epic: Найдено игр: {len(games)}", flush=True)
+        logger.info(f"Epic: Найдено игр: {len(games)}")
         for game in games:
             title = game.get("title", "")
             if "Battlefield" in title:
-                print(f"Epic: Найдена игра: {title}", flush=True)
+                logger.info(f"Epic: Найдена игра: {title}")
                 price = game["price"]["totalPrice"]["discountPrice"]
                 if price == 0:
                     product_slug = game.get("productSlug", game.get("urlSlug", ""))
@@ -147,13 +150,13 @@ def get_epic_battlefield():
                         "store": "Epic Games"
                     })
     except Exception as e:
-        print(f"Ошибка проверки Epic: {e}", flush=True)
-    print(f"Найдено раздач в Epic: {len(discounts)}", flush=True)
+        logger.error(f"Ошибка проверки Epic: {e}")
+    logger.info(f"Найдено раздач в Epic: {len(discounts)}")
     return discounts
 
 # GOG.com: Бесплатные раздачи и скидки
 def get_gog_battlefield():
-    print("Проверяю Battlefield в GOG.com... 🎁", flush=True)
+    logger.info("Проверяю Battlefield в GOG.com...")
     discounts = []
     try:
         url = "https://www.gog.com/en/games?priceRange=0,0"
@@ -163,7 +166,7 @@ def get_gog_battlefield():
         response = requests.get(url, headers=headers)
         soup = BeautifulSoup(response.content, "html.parser")
         games = soup.find_all("a", class_="product-tile")
-        print(f"GOG: Найдено бесплатных игр: {len(games)}", flush=True)
+        logger.info(f"GOG: Найдено бесплатных игр: {len(games)}")
         for game in games:
             title_element = game.find("span", class_="product-tile__title")
             if not title_element:
@@ -179,11 +182,12 @@ def get_gog_battlefield():
                     "url": game_url,
                     "store": "GOG.com"
                 })
-                print(f"GOG: Найдена бесплатная игра: {title}", flush=True)
+                logger.info(f"GOG: Найдена бесплатная игра: {title}")
 
         for title in BATTLEFIELD_TITLES:
             search_url = f"https://catalog.gog.com/v1/catalog?query={title}&order=desc:discounted&limit=10"
             response = requests.get(search_url, headers=headers).json()
+            time.sleep(1)
             products = response.get("products", [])
             for product in products:
                 if "Battlefield" in product["title"]:
@@ -199,15 +203,15 @@ def get_gog_battlefield():
                             "url": product_url,
                             "store": "GOG.com"
                         })
-                        print(f"GOG: Найдена скидка: {product['title']} - {discount}%", flush=True)
+                        logger.info(f"GOG: Найдена скидка: {product['title']} - {discount}%")
     except Exception as e:
-        print(f"Ошибка проверки GOG: {e}", flush=True)
-    print(f"Найдено в GOG.com: {len(discounts)}", flush=True)
+        logger.error(f"Ошибка проверки GOG: {e}")
+    logger.info(f"Найдено в GOG.com: {len(discounts)}")
     return discounts
 
 # IndieGala: Бесплатные раздачи
 def get_indiegala_battlefield():
-    print("Проверяю Battlefield в IndieGala... 🎉", flush=True)
+    logger.info("Проверяю Battlefield в IndieGala...")
     discounts = []
     try:
         url = "https://freebies.indiegala.com/"
@@ -217,7 +221,7 @@ def get_indiegala_battlefield():
         response = requests.get(url, headers=headers)
         soup = BeautifulSoup(response.content, "html.parser")
         games = soup.find_all("div", class_="relative")
-        print(f"IndieGala: Найдено бесплатных игр: {len(games)}", flush=True)
+        logger.info(f"IndieGala: Найдено бесплатных игр: {len(games)}")
         for game in games:
             title_element = game.find("h5", class_="font-bold")
             if not title_element:
@@ -233,15 +237,15 @@ def get_indiegala_battlefield():
                     "url": game_url,
                     "store": "IndieGala"
                 })
-                print(f"IndieGala: Найдена бесплатная игра: {title}", flush=True)
+                logger.info(f"IndieGala: Найдена бесплатная игра: {title}")
     except Exception as e:
-        print(f"Ошибка проверки IndieGala: {e}", flush=True)
-    print(f"Найдено в IndieGala: {len(discounts)}", flush=True)
+        logger.error(f"Ошибка проверки IndieGala: {e}")
+    logger.info(f"Найдено в IndieGala: {len(discounts)}")
     return discounts
 
 # Fanatical: Бесплатные раздачи
 def get_fanatical_battlefield():
-    print("Проверяю Battlefield в Fanatical... 🎈", flush=True)
+    logger.info("Проверяю Battlefield в Fanatical...")
     discounts = []
     try:
         url = "https://www.fanatical.com/en/blog/free-games"
@@ -251,7 +255,7 @@ def get_fanatical_battlefield():
         response = requests.get(url, headers=headers)
         soup = BeautifulSoup(response.content, "html.parser")
         articles = soup.find_all("article")
-        print(f"Fanatical: Найдено статей: {len(articles)}", flush=True)
+        logger.info(f"Fanatical: Найдено статей: {len(articles)}")
         for article in articles:
             title_element = article.find("h2")
             if not title_element:
@@ -269,15 +273,15 @@ def get_fanatical_battlefield():
                         "url": game_url,
                         "store": "Fanatical"
                     })
-                    print(f"Fanatical: Найдена бесплатная игра: {title}", flush=True)
+                    logger.info(f"Fanatical: Найдена бесплатная игра: {title}")
     except Exception as e:
-        print(f"Ошибка проверки Fanatical: {e}", flush=True)
-    print(f"Найдено в Fanatical: {len(discounts)}", flush=True)
+        logger.error(f"Ошибка проверки Fanatical: {e}")
+    logger.info(f"Найдено в Fanatical: {len(discounts)}")
     return discounts
 
 # Steam: Бесплатные раздачи через RSS-ленту
 def get_steam_battlefield():
-    print("Проверяю Battlefield в Steam (раздачи)... 🎮", flush=True)
+    logger.info("Проверяю Battlefield в Steam (раздачи)...")
     discounts = []
     try:
         url = "https://store.steampowered.com/feeds/news/"
@@ -287,7 +291,7 @@ def get_steam_battlefield():
         response = requests.get(url, headers=headers)
         soup = BeautifulSoup(response.content, "xml")
         items = soup.find_all("item")
-        print(f"Steam: Найдено новостей: {len(items)}", flush=True)
+        logger.info(f"Steam: Найдено новостей: {len(items)}")
         for item in items:
             title = item.find("title").text.strip()
             if "Battlefield" in title and "free" in title.lower():
@@ -302,23 +306,23 @@ def get_steam_battlefield():
                         "url": link,
                         "store": "Steam"
                     })
-                    print(f"Steam: Найдена бесплатная раздача: {title}", flush=True)
+                    logger.info(f"Steam: Найдена бесплатная раздача: {title}")
     except Exception as e:
-        print(f"Ошибка проверки Steam: {e}", flush=True)
-    print(f"Найдено в Steam: {len(discounts)}", flush=True)
+        logger.error(f"Ошибка проверки Steam: {e}")
+    logger.info(f"Найдено в Steam: {len(discounts)}")
     return discounts
 
 # Очистка posted_items раз в неделю
 def clear_posted_items():
-    print("Очищаю posted_items... 🧹", flush=True)
+    logger.info("Очищаю posted_items...")
     global posted_items
     posted_items.clear()
-    print("posted_items очищен!", flush=True)
+    logger.info("posted_items очищен!")
 
 # Проверка и публикация
 def check_battlefield(chat_id, user_chat_id=None):
     try:
-        print("Запускаю проверку Battlefield... ⚔️", flush=True)
+        logger.info("Запускаю проверку Battlefield...")
         all_discounts = (
             get_cheapshark_deals() +
             get_epic_battlefield() +
@@ -329,13 +333,13 @@ def check_battlefield(chat_id, user_chat_id=None):
         )
         new_discounts = 0
         if not all_discounts:
-            message = "🔍 Пока Battlefield отдыхает от скидок и раздач."
+            message = "🔍 Пока Battlefield отдыхает от скидок и раздач. Ждём следующую атаку акций! 💂‍♂️"
             bot.send_message(chat_id, message)
-            print(f"Отправлено сообщение в канал {chat_id}: {message}", flush=True)
+            logger.info(f"Отправлено сообщение в канал {chat_id}: {message}")
             if user_chat_id:
-                message = "✅ Проверка завершена! Новых скидок нет. Все актуальные скидки уже опубликованы в @SalePixel: https://t.me/SalePixel 📢"
+                message = "✅ Проверка завершена! Новых скидок нет. Все актуальные скидки в @SalePixel: https://t.me/SalePixel 📢"
                 bot.send_message(user_chat_id, message)
-                print(f"Отправлено сообщение пользователю {user_chat_id}: {message}", flush=True)
+                logger.info(f"Отправлено сообщение пользователю {user_chat_id}: {message}")
         else:
             for item in all_discounts:
                 item_id = item["id"]
@@ -348,16 +352,15 @@ def check_battlefield(chat_id, user_chat_id=None):
                         f"🔗 [Купить]({item['url']})"
                     )
                     bot.send_message(chat_id, message, parse_mode="Markdown", disable_web_page_preview=True)
-                    print(f"Отправлено сообщение в канал {chat_id}: {message}", flush=True)
-                    print(f"Опубликовано: {item['name']}", flush=True)
+                    logger.info(f"Отправлено сообщение в канал {chat_id}: {message}")
+                    logger.info(f"Опубликовано: {item['name']}")
                     posted_items.add(item_id)
                     new_discounts += 1
 
             if new_discounts == 0:
                 message = "🔍 Новых скидок нет. Все актуальные скидки уже опубликованы! ✅"
                 bot.send_message(chat_id, message)
-                print(f"Отправлено сообщение в канал {chat_id}: {message}", flush=True)
-                print("Отправлено сообщение: новых скидок нет", flush=True)
+                logger.info(f"Отправлено сообщение в канал {chat_id}: {message}")
 
         if user_chat_id:
             if new_discounts > 0:
@@ -365,93 +368,35 @@ def check_battlefield(chat_id, user_chat_id=None):
             else:
                 message = "✅ Проверка завершена! Новых скидок нет. Все актуальные скидки уже опубликованы в @SalePixel: https://t.me/SalePixel 📢"
             bot.send_message(user_chat_id, message)
-            print(f"Отправлено сообщение пользователю {user_chat_id}: {message}", flush=True)
-            print(f"Отправлено уведомление пользователю {user_chat_id}", flush=True)
+            logger.info(f"Отправлено сообщение пользователю {user_chat_id}: {message}")
     except Exception as e:
-        print(f"Ошибка в check_battlefield: {e}", flush=True)
+        logger.error(f"Ошибка в check_battlefield: {e}")
 
 # Корневой маршрут для проверки Render
 @app.route('/', methods=['GET'])
 def home():
-    print("Проверка корневого маршрута", flush=True)
+    logger.info("Проверка корневого маршрута")
     return "Bot is alive. Use /check in Telegram to trigger.", 200
 
 # Обработка webhook-запросов от Telegram
 @app.route('/webhook', methods=['POST'])
 def webhook():
-    print("Получен запрос на /webhook", flush=True)
+    logger.info("Получен запрос на /webhook")
     try:
         data = request.get_json()
         if not data:
-            print("Ошибка: Пустой JSON", flush=True)
+            logger.error("Пустой JSON")
             return 'Bad Request', 400
-        print(f"Полученные данные: {data}", flush=True)
+        logger.info(f"Полученные данные: {data}")
         update = telebot.types.Update.de_json(data)
         if not update:
-            print("Ошибка: Не удалось распарсить Update", flush=True)
+            logger.error("Не удалось распарсить Update")
             return 'Bad Request', 400
-
-        # Обработка новых участников группы
-        if update.message and update.message.new_chat_members:
-            chat_id = update.message.chat.id
-            for new_member in update.message.new_chat_members:
-                # Пропускаем, если новый участник — это сам бот
-                if new_member.id == bot.get_me().id:
-                    continue
-                first_name = new_member.first_name if new_member.first_name else "друг"
-                user_id = new_member.id
-                welcome_message = (
-                    f"👋 Привет, {first_name}! Добро пожаловать в нашу группу! 🎉\n"
-                    "Я бот, который ищет скидки и раздачи на Battlefield. "
-                    "Напиши /check, чтобы запустить проверку. "
-                    "Все скидки публикуются в @SalePixel: https://t.me/SalePixel 📢"
-                )
-                bot.send_message(chat_id, welcome_message)
-                print(f"Отправлено приветствие новому участнику {first_name} (ID: {user_id}) в чате {chat_id}", flush=True)
-
-        # Обработка личных сообщений
-        if update.message:
-            print(f"Личное сообщение получено: {update.message}", flush=True)
-            chat_id = update.message.chat.id
-            user_id = update.message.from_user.id
-            print(f"Текст сообщения: {update.message.text}, Chat ID: {chat_id}, Message ID: {update.message.message_id}", flush=True)
-            if update.message.text == '/check':
-                if not check_rate_limit(chat_id, user_id):
-                    return 'OK', 200
-                print("Команда /check получена в личке, запускаю проверку...", flush=True)
-                chat_id = '@SalePixel'
-                user_chat_id = update.message.chat.id
-                check_battlefield(chat_id, user_chat_id)
-            elif update.message.text == '/start':
-                if not check_rate_limit(chat_id, user_id):
-                    return 'OK', 200
-                print("Команда /start получена в личке, отправляю приветствие...", flush=True)
-                message = "👋 Привет! Я бот, который ищет скидки и раздачи на Battlefield. Напиши /check, чтобы запустить проверку. Все скидки публикуются в @SalePixel: https://t.me/SalePixel 📢"
-                bot.send_message(update.message.chat.id, message)
-                print(f"Отправлено сообщение пользователю {update.message.chat.id}: {message}", flush=True)
-            else:
-                print("Получена другая команда в личке, игнорирую", flush=True)
-
-        # Обработка сообщений из канала
-        elif update.channel_post:
-            print(f"Сообщение из канала получено: {update.channel_post}", flush=True)
-            chat_id = update.channel_post.chat.id
-            print(f"Текст сообщения: {update.channel_post.text}, Chat ID: {chat_id}", flush=True)
-            if update.channel_post.text == '/check':
-                print("Команда /check получена в канале, запускаю проверку...", flush=True)
-                chat_id = '@SalePixel'
-                check_battlefield(chat_id)
-            elif update.channel_post.text == '/start':
-                print("Команда /start получена в канале, отправляю приветствие...", flush=True)
-                message = "👋 Привет! Я бот, который ищет скидки и раздачи на Battlefield. Напиши /check, чтобы запустить проверку. Все скидки публикуются в @SalePixel: https://t.me/SalePixel 📢"
-                bot.send_message(update.channel_post.chat.id, message)
-                print(f"Отправлено сообщение в канал {update.channel_post.chat.id}: {message}", flush=True)
-            else:
-                print("Получена другая команда в канале, игнорирую", flush=True)
-
+        bot.process_new_updates([update])
+        logger.info("Обновление успешно обработано")
         return 'OK', 200
     except Exception as e:
-        print(f"Ошибка в webhook: {e}", flush=True)
+        logger.error(f"Ошибка в webhook: {str(e)}")
         return 'Error', 500
 
 # Установка webhook при запуске
@@ -459,23 +404,76 @@ def set_webhook():
     webhook_url = 'https://battlefield-bot.onrender.com/webhook'
     try:
         bot.remove_webhook()
+        time.sleep(0.1)
         bot.set_webhook(url=webhook_url)
-        print(f"Webhook установлен: {webhook_url}", flush=True)
+        logger.info(f"Webhook установлен: {webhook_url}")
     except Exception as e:
-        print(f"Ошибка установки webhook: {e}", flush=True)
+        logger.error(f"Ошибка установки webhook: {e}")
+
+# Обработка команд
+@bot.message_handler(commands=['check'])
+def handle_check(message):
+    chat_id = message.chat.id
+    user_id = message.from_user.id if message.from_user else None
+    logger.info(f"Текст сообщения: {message.text}, Chat ID: {chat_id}, Message ID: {message.message_id}")
+    
+    if message.chat.type == 'private':
+        logger.info("Команда /check получена в личке, запускаю проверку...")
+        if check_rate_limit(chat_id, user_id):
+            check_battlefield(CHAT_ID, user_chat_id=chat_id)
+    elif message.chat.type in ['group', 'supergroup', 'channel']:
+        logger.info("Команда /check получена в канале, запускаю проверку...")
+        check_battlefield(CHAT_ID)
+
+@bot.message_handler(content_types=['new_chat_members'])
+def handle_new_members(message):
+    chat_id = message.chat.id
+    for new_member in message.new_chat_members:
+        if new_member.id == bot.get_me().id:
+            continue
+        first_name = new_member.first_name if new_member.first_name else "друг"
+        user_id = new_member.id
+        welcome_message = (
+            f"👋 Привет, {first_name}! Добро пожаловать в нашу группу! 🎉\n"
+            "Я бот, который ищет скидки и раздачи на Battlefield. "
+            "Напиши /check, чтобы запустить проверку. "
+            "Все скидки публикуются в @SalePixel: https://t.me/SalePixel 📢"
+        )
+        bot.send_message(chat_id, welcome_message)
+        logger.info(f"Отправлено приветствие новому участнику {first_name} (ID: {user_id}) в чате {chat_id}")
 
 # Запуск
 if __name__ == "__main__":
-    print("Бот запущен! 🚀", flush=True)
+    logger.info("Бот запущен!")
     
-    # Настройка планировщика с часовым поясом UTC
-    scheduler = BackgroundScheduler(timezone=pytz.UTC)
-    # Проверка в 12:00 UTC = 15:00 МСК
-    scheduler.add_job(check_battlefield, 'cron', hour=12, minute=0, args=[CHAT_ID])
-    scheduler.add_job(clear_posted_items, 'cron', day_of_week='mon', hour=0, minute=0)
+    # Настройка планировщика с часовым поясом МСК
+    scheduler = BackgroundScheduler(timezone=pytz.timezone('Europe/Moscow'))
+    scheduler.add_job(
+        check_battlefield,
+        'cron',
+        hour=15,
+        minute=0,
+        args=[CHAT_ID],
+        misfire_grace_time=3600  # Допуск на пропущенные задачи: 1 час
+    )
+    scheduler.add_job(
+        clear_posted_items,
+        'cron',
+        day_of_week='mon',
+        hour=0,
+        minute=0,
+        misfire_grace_time=3600
+    )
+    # Тестовая задача для немедленного выполнения
+    scheduler.add_job(
+        check_battlefield,
+        'date',
+        run_date=datetime.now(pytz.timezone('Europe/Moscow')),
+        args=[CHAT_ID]
+    )
     scheduler.start()
-    print("Планировщик запущен с часовым поясом UTC", flush=True)
+    logger.info("Планировщик запущен с часовым поясом МСК")
 
     set_webhook()
-    port = int(os.getenv('PORT', 8000))
+    port = int(os.getenv('PORT', 10000))
     app.run(host='0.0.0.0', port=port)
